@@ -1,0 +1,17 @@
+{
+  "name": "takt-documentation-checks",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "check:markdown": "markdownlint-cli2 \"../../docs/**/*.md\"",
+    "check:encoding": "node check-docs.mjs encoding",
+    "check:links": "node check-docs.mjs links",
+    "check:translations": "node check-docs.mjs translations",
+    "test": "node --test check-docs.test.mjs"
+  },
+  "devDependencies": {
+    "github-slugger": "2.0.0",
+    "markdown-it": "15.0.0",
+    "markdownlint-cli2": "0.23.2"
+  }
+}
