@@ -28,6 +28,30 @@ Time is stored as `timestamptz`; calculation uses actual elapsed time in UTC and
 
 HTTP exposes calculation of supplied intervals and health checks. Operations on stored personal data remain internal to the application and require a verified user.
 
+## Attendance commands
+
+Internal commands receive a verified user and server time in `now`.
+
+| Operation | Purpose |
+| --- | --- |
+| `check_in` | Start attendance after the required time has been set once |
+| `start_break` | Start a break within open attendance |
+| `end_break` | End the specified current break |
+| `preview_checkout` | Obtain the total for confirmation and whether the break will end |
+| `check_out` | After explicit confirmation, end attendance and its current break together |
+| `reopen_attendance` | Undo the latest departure and restore the preceding state |
+| `current_attendance` | Read current open attendance after reopening the application |
+
+Each modifying command receives a `request_id`. Its successful result is saved in `time_command_receipts` in the same transaction as the entries and `audit_log`. Retrying the same request returns its original result; its identifier cannot be reused for another operation or different parameters. Rejected commands leave no partial changes.
+
+Commands on existing attendance include `expected_revision`. If another device has changed the record, the command is rejected with `stale_revision`: refresh the data and confirmation. Departure requires `confirmed`; the preview's `will_end_break` flag lets the caller explicitly explain that the break will also end.
+
+Undoing departure also restores the break that departure ended automatically. Breaks ended independently beforehand remain closed. If a subsequent attendance interval already exists, undo is rejected to avoid an overlap. The audit log retains the state before and after each change.
+
+A saved retry response does not replace current state: after reconnecting, the caller reads `current_attendance`. For example, retrying an old departure command after undo returns its original response but does not close attendance again.
+
+Commands modify only the user's own attendance. An administrator's permission to read individual accounting does not let these commands change someone else's entries.
+
 ## Checks
 
 ```sh

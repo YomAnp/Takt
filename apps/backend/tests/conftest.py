@@ -1,6 +1,8 @@
 import os
 from pathlib import Path
+from uuid import uuid4
 
+import psycopg
 import pytest
 import pytest_asyncio
 from alembic import command
@@ -31,6 +33,28 @@ def migrated_database():
         command.upgrade(config, "head")
         command.check(config)
         command.downgrade(config, "base")
+        command.upgrade(config, "0001_time")
+        user_id, attendance_id = uuid4(), uuid4()
+        connection_args = parsed.translate_connect_args(username="user", database="dbname")
+        with psycopg.connect(**connection_args) as connection:
+            connection.execute("INSERT INTO users (id) VALUES (%s)", (user_id,))
+            connection.execute(
+                "INSERT INTO attendance (id, user_id, started_at) VALUES (%s, %s, %s)",
+                (attendance_id, user_id, "2026-10-27T08:30:00+03:00"),
+            )
+        command.upgrade(config, "head")
+        command.check(config)
+        with psycopg.connect(**connection_args) as connection:
+            record = connection.execute(
+                "SELECT user_id, ended_at, revision FROM attendance WHERE id = %s",
+                (attendance_id,),
+            ).fetchone()
+            assert record == (user_id, None, 1), "Upgrade changed an existing attendance record"
+        command.downgrade(config, "0001_time")
+        with psycopg.connect(**connection_args) as connection:
+            assert connection.execute(
+                "SELECT user_id, ended_at FROM attendance WHERE id = %s", (attendance_id,)
+            ).fetchone() == (user_id, None)
         command.upgrade(config, "head")
         yield url
     finally:
