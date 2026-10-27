@@ -48,6 +48,7 @@ class AttendanceRecord(Base):
     __tablename__ = "attendance"
     __table_args__ = (
         CheckConstraint("ended_at IS NULL OR ended_at > started_at", name="positive_attendance"),
+        CheckConstraint("revision > 0", name="positive_attendance_revision"),
         ExcludeConstraint(
             ("user_id", "="),
             (func.tstzrange(text("started_at"), text("ended_at"), text("'[)'")), "&&"),
@@ -60,6 +61,7 @@ class AttendanceRecord(Base):
     user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"))
     started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     ended_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    revision: Mapped[int] = mapped_column(Integer, server_default="1")
     breaks: Mapped[list["BreakRecord"]] = relationship(
         back_populates="attendance", lazy="raise", order_by="BreakRecord.started_at"
     )
@@ -91,4 +93,16 @@ class AuditRecord(Base):
     actor_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"))
     action: Mapped[str] = mapped_column(String(64))
     details: Mapped[dict[str, object]] = mapped_column(JSONB)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class CommandReceipt(Base):
+    __tablename__ = "time_command_receipts"
+
+    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), primary_key=True)
+    request_id: Mapped[uuid.UUID] = mapped_column(UUID, primary_key=True)
+    attendance_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("attendance.id"), index=True)
+    operation: Mapped[str] = mapped_column(String(32))
+    parameters: Mapped[dict[str, object]] = mapped_column(JSONB)
+    result: Mapped[dict[str, object]] = mapped_column(JSONB)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

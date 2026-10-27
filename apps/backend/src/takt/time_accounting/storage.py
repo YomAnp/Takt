@@ -7,26 +7,13 @@ from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from takt.time_accounting.access import AccessDenied, load_actor
 from takt.time_accounting.calculation import Attendance, Break, Summary, calculate
-from takt.time_accounting.models import AttendanceRecord, AuditRecord, TimeGoal, User
-
-
-class AccessDenied(PermissionError):
-    pass
+from takt.time_accounting.models import AttendanceRecord, AuditRecord, TimeGoal
 
 
 class MissingGoal(ValueError):
     pass
-
-
-async def _actor(session: AsyncSession, actor_id: UUID, *, lock: bool = False) -> User:
-    query = select(User).where(User.id == actor_id)
-    if lock:
-        query = query.with_for_update()
-    actor = await session.scalar(query)
-    if actor is None or not actor.is_active:
-        raise AccessDenied("The account does not have access.")
-    return actor
 
 
 async def set_goal(
@@ -44,7 +31,7 @@ async def set_goal(
         raise ValueError("The change timestamp must include its UTC offset.")
     effective_from = now.astimezone(time_zone).date()
     async with session.begin():
-        await _actor(session, actor_id, lock=True)
+        await load_actor(session, actor_id, lock=True)
         old_goal = await session.scalar(
             select(TimeGoal.required_minutes)
             .where(TimeGoal.user_id == actor_id, TimeGoal.effective_from <= effective_from)
@@ -88,44 +75,52 @@ async def get_summary(
     """Read personal accounting, or any employee's accounting for an active admin."""
     async with session.begin():
         await session.execute(text("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ, READ ONLY"))
-        actor = await _actor(session, actor_id)
+        actor = await load_actor(session, actor_id)
         if actor_id != user_id and actor.role != "admin":
             raise AccessDenied("Only an administrator can read another account's records.")
-        goal = await session.scalar(
-            select(TimeGoal.required_minutes)
-            .where(TimeGoal.user_id == user_id, TimeGoal.effective_from <= work_date)
-            .order_by(TimeGoal.effective_from.desc())
-            .limit(1)
+        return await load_summary(
+            session, user_id=user_id, work_date=work_date, as_of=as_of, time_zone=time_zone
         )
-        if goal is None:
-            raise MissingGoal("No required time was set for this date.")
-        day_start = datetime.combine(work_date, time.min, time_zone)
-        day_end = datetime.combine(work_date + timedelta(days=1), time.min, time_zone)
-        records = (
-            await session.scalars(
-                select(AttendanceRecord)
-                .where(
-                    AttendanceRecord.user_id == user_id,
-                    AttendanceRecord.started_at < day_end,
-                    or_(AttendanceRecord.ended_at.is_(None), AttendanceRecord.ended_at > day_start),
-                )
-                .options(selectinload(AttendanceRecord.breaks))
-                .order_by(AttendanceRecord.started_at)
+
+
+async def load_summary(
+    session: AsyncSession, *, user_id: UUID, work_date: date, as_of: datetime, time_zone: ZoneInfo
+) -> Summary:
+    """Load a summary inside an existing transaction; the caller must authorize the user."""
+    goal = await session.scalar(
+        select(TimeGoal.required_minutes)
+        .where(TimeGoal.user_id == user_id, TimeGoal.effective_from <= work_date)
+        .order_by(TimeGoal.effective_from.desc())
+        .limit(1)
+    )
+    if goal is None:
+        raise MissingGoal("No required time was set for this date.")
+    day_start = datetime.combine(work_date, time.min, time_zone)
+    day_end = datetime.combine(work_date + timedelta(days=1), time.min, time_zone)
+    records = (
+        await session.scalars(
+            select(AttendanceRecord)
+            .where(
+                AttendanceRecord.user_id == user_id,
+                AttendanceRecord.started_at < day_end,
+                or_(AttendanceRecord.ended_at.is_(None), AttendanceRecord.ended_at > day_start),
             )
-        ).all()
-        return calculate(
-            work_date=work_date,
-            required_minutes=goal,
-            as_of=as_of,
-            time_zone=time_zone,
-            intervals=tuple(
-                Attendance(
-                    started_at=record.started_at,
-                    ended_at=record.ended_at,
-                    breaks=tuple(
-                        Break(pause.started_at, pause.ended_at) for pause in record.breaks
-                    ),
-                )
-                for record in records
-            ),
+            .options(selectinload(AttendanceRecord.breaks))
+            .execution_options(populate_existing=True)
+            .order_by(AttendanceRecord.started_at)
         )
+    ).all()
+    return calculate(
+        work_date=work_date,
+        required_minutes=goal,
+        as_of=as_of,
+        time_zone=time_zone,
+        intervals=tuple(
+            Attendance(
+                started_at=record.started_at,
+                ended_at=record.ended_at,
+                breaks=tuple(Break(pause.started_at, pause.ended_at) for pause in record.breaks),
+            )
+            for record in records
+        ),
+    )
