@@ -6,37 +6,9 @@ This document describes the selected stack and division of responsibilities in T
 
 ## Time accounting
 
-Required time, entries, and calculated results are distinct data. Required time defines a target duration; entries describe events; calculations apply rules to those events. Class schedules and teaching load do not replace attendance requirements.
+An employee saves their working-day end time once, for example 18:00. Arrival and departure are recorded explicitly; a delayed entry can use the actual event time. Optional break entries provide personal statistics and remain part of total attendance.
 
-| Term | Meaning |
-| --- | --- |
-| Required time | Attendance duration to accumulate over a defined period |
-| Attendance interval | The time between arrival and departure; an open interval has no departure entry yet |
-| Excluded break | Time within an attendance interval that does not count under the applicable rules |
-| Credited time | Duration counted according to entries and rules |
-| Remaining time | Time still needed to meet the requirement; zero once the requirement is met |
-| Estimated completion time | A forecast of when the requirement will be met, under explicit assumptions about continued attendance |
-
-### Calculation example
-
-An employee arrives at 08:30. The requirement is 6 ordinary hours of 60 minutes each. By 13:10, an excluded break of 30 minutes has already taken place. All entries belong to one day in one time zone; there are no other constraints or subsequent breaks in this example.
-
-| Calculation | Result |
-| --- | --- |
-| Time since arrival: 13:10 − 08:30 | 4 h 40 min |
-| Credited time: 4 h 40 min − 30 min | 4 h 10 min |
-| Remaining time: 6 h − 4 h 10 min | 1 h 50 min |
-| Completion with continuous attendance: 13:10 + 1 h 50 min | 15:00 |
-
-This illustrates the arithmetic, not a college timetable. Another excluded break or an entry correction will change the forecast.
-
-### Calculation requirements
-
-Overlapping intervals must not count time twice, and repeating a request must not create a duplicate entry. Concurrent corrections must preserve record consistency. Results for an open day must identify the time at which the calculation was made; meeting the required time does not itself mean that the employee has left.
-
-Event time differs from recording time: an arrival at 08:30 can be entered later. The time zone and day boundary must be explicit, including for intervals crossing midnight. Recalculation after a change to required time must explain which records and rules were used.
-
-An employee sets their personal required time once and changes it in settings. A new value applies to the current and subsequent days; past days retain their earlier requirement. Breaks have explicit start and end entries and are excluded from credited time. Hours are ordinary hours of 60 minutes.
+[Accounting rules and workflows](product/time-accounting.md) define recovery of a missed departure, time beyond the scheduled end, and first launch.
 
 ## Components and dependencies
 
@@ -56,7 +28,7 @@ Responsibilities within the server follow subject areas:
 | Area | Contents and allowed dependencies |
 | --- | --- |
 | Identity and access | Employee identity and operation permissions; accepts verified Telegram data and does not calculate time |
-| Time rules | Required time and eligibility rules; independent of HTTP and Telegram |
+| Time rules | Working-day end time and calculation rules; independent of HTTP and Telegram |
 | Accounting | Entries, intervals, and calculations; uses time rules, while write workflows call access checks and storage |
 | Telegram | Official API adapter; passes verified identity to the access area and contains no separate copy of accounting rules |
 

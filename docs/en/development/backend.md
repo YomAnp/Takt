@@ -18,29 +18,32 @@ Local database parameters are shown in `env.example`. Set the `TAKT_DATABASE_URL
 
 ## Data and calculations
 
-`users` stores the user, their `member` or `admin` role, and active access status. Required time is stored in `time_goals` with an effective date: a new value applies today and onward, while earlier dates use the previous rule. Repeating the same value creates no entry in `audit_log`.
+`users` stores the user, their `member` or `admin` role, and active access status. `work_schedules` stores the local working-day end time with an effective date. `set_schedule` changes it from the current date in one transaction with `audit_log`; repeating the same value creates no redundant entry. Past days use the earlier rule.
 
 `attendance` stores attendance intervals, and `breaks` stores explicitly recorded breaks. PostgreSQL prevents overlapping intervals for one user, overlapping breaks, and breaks outside attendance boundaries. An open interval never receives a fabricated departure time.
 
-`get_summary` reads stored records and passes them to the calculation module. Employees can access their own accounting; active administrators can access employees' individual accounting. Disabled accounts cannot access records. `set_goal` changes the user's own required time in one transaction with the audit entry.
+`get_summary` reads stored records and passes them to the calculation module. Employees can access their own accounting; active administrators can access employees' individual accounting. Disabled accounts cannot access records.
 
-Time is stored as `timestamptz`; calculation uses actual elapsed time in UTC and calendar-day boundaries in the selected time zone. Break seconds are excluded. No completion forecast is given during an open break. When the requirement is met, the calculation returns the time it was reached; closed intervals stop accumulating time.
+Time is stored as `timestamptz`; durations are calculated in UTC, while the arrival date and scheduled ending use the application's time zone. An interval belongs entirely to its arrival date, including departure after midnight. Breaks count toward total attendance and are summed separately for personal statistics. A current-day open interval gives a provisional total. For a previous open day, the total is unknown until departure is confirmed; the sum of closed intervals is returned separately. Departure preview uses the proposed ending without writing to the database.
+
+`POST /api/v1/time/day` calculates supplied intervals against a working-day end time. The duration calculation `POST /api/v1/time/calculate`, `time_goals`, and `set_goal` retain the earlier data format; they do not configure a new working day. Both calculations include breaks in the total. Detailed [accounting rules](../product/time-accounting.md) contain examples.
 
 HTTP exposes calculation of supplied intervals and health checks. Operations on stored personal data remain internal to the application and require a verified user.
 
 ## Attendance commands
 
-Internal commands receive a verified user and server time in `now`.
+Internal commands receive a verified user and server time in `now`. Arrival and departure also accept `occurred_at`, the actual event time when recorded later. It cannot be in the future; the audit log separately retains `recorded_at`.
 
 | Operation | Purpose |
 | --- | --- |
-| `check_in` | Start attendance after the required time has been set once |
+| `check_in` | Start attendance after saving the working-day end time |
 | `start_break` | Start a break within open attendance |
 | `end_break` | End the specified current break |
 | `preview_checkout` | Obtain the total for confirmation and whether the break will end |
 | `check_out` | After explicit confirmation, end attendance and its current break together |
 | `reopen_attendance` | Undo the latest departure and restore the preceding state |
 | `current_attendance` | Read current open attendance after reopening the application |
+| `pending_departure` | Obtain a previous open day and whether its saved ending can be used |
 
 Each modifying command receives a `request_id`. Its successful result is saved in `time_command_receipts` in the same transaction as the entries and `audit_log`. Retrying the same request returns its original result; its identifier cannot be reused for another operation or different parameters. Rejected commands leave no partial changes.
 
@@ -52,6 +55,8 @@ A saved retry response does not replace current state: after reconnecting, the c
 
 Commands modify only the user's own attendance. An administrator's permission to read individual accounting does not let these commands change someone else's entries.
 
+`pending_departure` never closes attendance automatically. Users confirm that day's saved end time or actual departure. The suggested time is unavailable if it precedes recorded events. Open attendance must be closed before a new arrival.
+
 ## Checks
 
 ```sh
@@ -60,4 +65,4 @@ python scripts/dev.py check
 
 The command creates a separate `takt_test` database and runs Ruff, mypy, and pytest. Tests apply and roll back migrations; test tables are recreated. Checks do not use the working `takt` database.
 
-Set `TAKT_TEST_DATABASE_URL` to test in another environment. The test database name must end in `_test`; otherwise checks stop. Coverage includes calculation and paused time, goal changes preserving past days, administrator access, PostgreSQL constraints, and concurrent write conflicts. GitHub Actions runs the same checks.
+Set `TAKT_TEST_DATABASE_URL` to test in another environment. The test database name must end in `_test`; otherwise checks stop. Coverage includes optional breaks without pausing total time, missed departure, actual event times, crossing midnight, end-time changes preserving past days, administrator access, PostgreSQL constraints, and concurrent write conflicts. GitHub Actions runs the same checks.

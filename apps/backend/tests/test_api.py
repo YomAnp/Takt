@@ -35,7 +35,7 @@ async def test_calculation_endpoint_validates_timestamps_and_intervals():
         }
         response = await client.post("/api/v1/time/calculate", json=payload)
         assert response.status_code == 200
-        assert response.json()["credited_seconds"] == 15000
+        assert response.json()["credited_seconds"] == 16800
         payload["intervals"][0]["started_at"] = "2026-10-27T08:30:00"
         assert (await client.post("/api/v1/time/calculate", json=payload)).status_code == 422
         payload["intervals"][0]["started_at"] = "2026-10-27T14:00:00+03:00"

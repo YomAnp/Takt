@@ -25,18 +25,20 @@ def test_time_with_completed_break():
     value = summary((Attendance(at("08:30"), breaks=(Break(at("12:00"), at("12:30")),)),))
     assert value.presence_seconds == 280 * 60
     assert value.break_seconds == 30 * 60
-    assert value.credited_seconds == 250 * 60
-    assert value.remaining_seconds == 110 * 60
-    assert value.estimated_completion_at == at("15:00")
+    assert value.credited_seconds == 280 * 60
+    assert value.remaining_seconds == 80 * 60
+    assert value.estimated_completion_at == at("14:30")
     assert value.state == "working"
 
 
-def test_open_break_pauses_credit_and_forecast():
+def test_optional_break_is_recorded_without_pausing_total_time():
     intervals = (Attendance(at("08:30"), breaks=(Break(at("12:00")),)),)
     first = summary(intervals, "12:10")
     later = summary(intervals, "13:10")
-    assert first.credited_seconds == later.credited_seconds == 210 * 60
-    assert later.estimated_completion_at is None
+    assert first.credited_seconds == 220 * 60
+    assert later.credited_seconds == 280 * 60
+    assert later.break_seconds == 70 * 60
+    assert later.estimated_completion_at == at("14:30")
     assert later.state == "on_break"
 
 
@@ -56,9 +58,9 @@ def test_multiple_intervals_and_actual_target_completion():
         ),
         "17:00",
     )
-    assert value.credited_seconds == 390 * 60
+    assert value.credited_seconds == 420 * 60
     assert value.remaining_seconds == 0
-    assert value.target_reached_at == at("15:30")
+    assert value.target_reached_at == at("15:00")
     assert value.estimated_completion_at is None
 
 
