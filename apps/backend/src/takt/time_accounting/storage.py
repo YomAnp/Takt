@@ -83,7 +83,7 @@ async def get_summary(
     async with session.begin():
         await session.execute(text("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ, READ ONLY"))
         actor = await load_actor(session, actor_id)
-        if actor_id != user_id and actor.role != "admin":
+        if actor_id != user_id and actor.role not in {"admin", "superadmin"}:
             raise AccessDenied("Only an administrator can read another account's records.")
         return await load_summary(
             session, user_id=user_id, work_date=work_date, as_of=as_of, time_zone=time_zone

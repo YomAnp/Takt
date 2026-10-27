@@ -23,10 +23,15 @@ from takt.database import Base
 
 class User(Base):
     __tablename__ = "users"
-    __table_args__ = (CheckConstraint("role IN ('member', 'admin')", name="valid_user_role"),)
+    __table_args__ = (
+        CheckConstraint("role IN ('member', 'admin', 'superadmin')", name="valid_user_role"),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(UUID, primary_key=True, default=uuid.uuid4)
     telegram_id: Mapped[int | None] = mapped_column(BigInteger, unique=True)
+    display_name: Mapped[str] = mapped_column(String(80), server_default="")
+    telegram_username: Mapped[str | None] = mapped_column(String(64))
+    onboarded_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     role: Mapped[str] = mapped_column(String(16), server_default="member")
     is_active: Mapped[bool] = mapped_column(Boolean, server_default=text("true"))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
@@ -117,3 +122,17 @@ class WorkSchedule(Base):
     user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"))
     effective_from: Mapped[date] = mapped_column(Date)
     end_time: Mapped[time] = mapped_column(Time)
+
+
+class AuthSession(Base):
+    __tablename__ = "auth_sessions"
+    token_hash: Mapped[str] = mapped_column(String(64), primary_key=True)
+    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"))
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+
+
+class OwnerBinding(Base):
+    __tablename__ = "owner_binding"
+    __table_args__ = (CheckConstraint("id = 1", name="single_owner"),)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), unique=True)

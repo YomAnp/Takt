@@ -9,8 +9,18 @@ from sqlalchemy.exc import ArgumentError
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="TAKT_", extra="ignore", hide_input_in_errors=True)
 
+    bot_token: SecretStr | None = None
+    superadmin_username: str = ""
+    public_url: str = "http://localhost:5173"
     time_zone: str = "Europe/Moscow"
     database_url: SecretStr = SecretStr("postgresql+psycopg://takt:takt_local@127.0.0.1:5432/takt")
+
+    @field_validator("bot_token", mode="before")
+    @classmethod
+    def empty_token(cls, value: object) -> object:
+        if value == "":
+            return None
+        return value
 
     @field_validator("database_url")
     @classmethod

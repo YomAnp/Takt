@@ -25,6 +25,10 @@ The [project overview](project.md) explains the selected stack and component bou
 
 [Backend development](development/backend.md): PostgreSQL and API startup, storage, and checks.
 
+[Frontend development](development/frontend.md): screens, structure, and checks.
+
+[Server installation](development/hosting.md): Docker, domain, Telegram, and access management.
+
 ## Documentation
 
 The Russian and English versions contain the same information. The language link opens the corresponding page; changes update both versions in the same pull request.
