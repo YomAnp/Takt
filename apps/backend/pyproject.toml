@@ -4,6 +4,7 @@ version = "0.1.0"
 description = "Time accounting API for MGRI employees"
 requires-python = ">=3.12,<3.14"
 dependencies = [
+  "aiogram>=3.31,<4",
   "alembic>=1.14,<2",
   "fastapi>=0.115,<1",
   "psycopg[binary]>=3.2,<4",
@@ -39,6 +40,9 @@ line-length = 100
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["takt"]
 
 [tool.mypy]
 python_version = "3.12"

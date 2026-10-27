@@ -483,31 +483,40 @@ async def pending_departure(
             .options(selectinload(AttendanceRecord.breaks))
             .execution_options(populate_existing=True)
         )
-        if record is None:
-            return None
-        work_date = record.started_at.astimezone(time_zone).date()
-        if work_date >= now.astimezone(time_zone).date():
-            return None
-        end_time = await session.scalar(
-            select(WorkSchedule.end_time)
-            .where(WorkSchedule.user_id == actor_id, WorkSchedule.effective_from <= work_date)
-            .order_by(WorkSchedule.effective_from.desc())
-            .limit(1)
-        )
-        ending = (
-            datetime.combine(work_date, end_time, time_zone).astimezone(UTC) if end_time else None
-        )
-        can_use = ending is not None and record.started_at < ending <= now
-        if can_use and ending is not None:
-            try:
-                _check_clock(record, ending)
-                pause = _active_break(record)
-                can_use = pause is None or ending > pause.started_at
-            except CommandConflict:
-                can_use = False
-        return PendingDeparture(
-            attendance=AttendanceSnapshot.model_validate(record),
-            work_date=work_date,
-            scheduled_end_at=ending,
-            can_use_scheduled_end=can_use,
-        )
+        return await describe_pending(session, record, now=now, time_zone=time_zone)
+
+
+async def describe_pending(
+    session: AsyncSession,
+    record: AttendanceRecord | None,
+    *,
+    now: datetime,
+    time_zone: ZoneInfo,
+) -> PendingDeparture | None:
+    """Describe recovery inside the caller's authorized snapshot transaction."""
+    if record is None:
+        return None
+    work_date = record.started_at.astimezone(time_zone).date()
+    if work_date >= now.astimezone(time_zone).date():
+        return None
+    end_time = await session.scalar(
+        select(WorkSchedule.end_time)
+        .where(WorkSchedule.user_id == record.user_id, WorkSchedule.effective_from <= work_date)
+        .order_by(WorkSchedule.effective_from.desc())
+        .limit(1)
+    )
+    ending = datetime.combine(work_date, end_time, time_zone).astimezone(UTC) if end_time else None
+    can_use = ending is not None and record.started_at < ending <= now
+    if can_use and ending is not None:
+        try:
+            _check_clock(record, ending)
+            pause = _active_break(record)
+            can_use = pause is None or ending > pause.started_at
+        except CommandConflict:
+            can_use = False
+    return PendingDeparture(
+        attendance=AttendanceSnapshot.model_validate(record),
+        work_date=work_date,
+        scheduled_end_at=ending,
+        can_use_scheduled_end=can_use,
+    )

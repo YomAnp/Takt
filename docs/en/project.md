@@ -83,7 +83,7 @@ The directory layout separates application areas with different dependencies and
 | `apps/backend/tests/` | Checks for calculations, workflows, access, and the HTTP API |
 | `apps/backend/migrations/` | Alembic migrations, separate from application code |
 | `apps/frontend/src/` | Interface code and Telegram integration |
-| `apps/frontend/src/api/generated/` | Generated client; handwritten API integration code belongs outside this directory |
+| `apps/frontend/src/shared/api/generated/` | Generated client; handwritten API integration code belongs outside this directory |
 | `apps/frontend/tests/` | Checks for the interface and its interaction with the server |
 | `docs/ru/`, `docs/en/` | Home page and project overview in both languages |
 

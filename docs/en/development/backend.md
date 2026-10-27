@@ -18,7 +18,7 @@ Local database parameters are shown in `env.example`. Set the `TAKT_DATABASE_URL
 
 ## Data and calculations
 
-`users` stores the user, their `member` or `admin` role, and active access status. `work_schedules` stores the local working-day end time with an effective date. `set_schedule` changes it from the current date in one transaction with `audit_log`; repeating the same value creates no redundant entry. Past days use the earlier rule.
+`users` stores the user, their `member`, `admin`, or `superadmin` role, and active access status. `work_schedules` stores the local working-day end time with an effective date. `set_schedule` changes it from the current date in one transaction with `audit_log`; repeating the same value creates no redundant entry. Past days use the earlier rule.
 
 `attendance` stores attendance intervals, and `breaks` stores explicitly recorded breaks. PostgreSQL prevents overlapping intervals for one user, overlapping breaks, and breaks outside attendance boundaries. An open interval never receives a fabricated departure time.
 
@@ -28,7 +28,9 @@ Time is stored as `timestamptz`; durations are calculated in UTC, while the arri
 
 `POST /api/v1/time/day` calculates supplied intervals against a working-day end time. The duration calculation `POST /api/v1/time/calculate`, `time_goals`, and `set_goal` retain the earlier data format; they do not configure a new working day. Both calculations include breaks in the total. Detailed [accounting rules](../product/time-accounting.md) contain examples.
 
-HTTP exposes calculation of supplied intervals and health checks. Operations on stored personal data remain internal to the application and require a verified user.
+HTTP exposes personal entries and state, statistics, preferences, and access management. The server verifies Telegram `initData`: signature, unique fields, and an age of up to 5 minutes. An issued session lasts 12 hours; only its hash is stored in the database. The client keeps its session token in memory. Disabled users cannot access records. Roles and setup are described in the [hosting guide](hosting.md).
+
+The `/api/v1/me/state` response reads entries, pending departure, and totals in one `REPEATABLE READ` transaction. HTTP handlers call the same accounting commands covered by integration tests.
 
 ## Attendance commands
 

@@ -1,0 +1,67 @@
+name: takt-host
+x-backend: &backend
+  image: ${COMPOSE_PROJECT_NAME:-takt-host}-backend:local
+  build: apps/backend
+  environment: &environment
+    TAKT_DATABASE_URL: postgresql+psycopg://takt:${TAKT_POSTGRES_PASSWORD:?Run host.py setup first}@db:5432/takt
+    TAKT_BOT_TOKEN: ${TAKT_BOT_TOKEN:-}
+    TAKT_SUPERADMIN_USERNAME: ${TAKT_SUPERADMIN_USERNAME:-}
+    TAKT_PUBLIC_URL: ${TAKT_PUBLIC_URL:?Set public URL}
+    TAKT_TIME_ZONE: ${TAKT_TIME_ZONE:-Europe/Moscow}
+  restart: unless-stopped
+  init: true
+
+services:
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: takt
+      POSTGRES_DB: takt
+      POSTGRES_PASSWORD: ${TAKT_POSTGRES_PASSWORD:?Run host.py setup first}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U takt -d takt"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+  migrate:
+    <<: *backend
+    restart: "no"
+    command: ["alembic", "upgrade", "head"]
+    depends_on:
+      db: {condition: service_healthy}
+  api:
+    <<: *backend
+    depends_on:
+      migrate: {condition: service_completed_successfully}
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/ready', timeout=3)"]
+      interval: 5s
+      timeout: 4s
+      retries: 20
+  bot:
+    <<: *backend
+    command: ["python", "-m", "takt.bot"]
+    profiles: ["telegram"]
+    depends_on:
+      api: {condition: service_healthy}
+  web:
+    build: apps/frontend
+    restart: unless-stopped
+    environment:
+      TAKT_SITE_ADDRESS: ${TAKT_SITE_ADDRESS:?Set domain or local address}
+    ports:
+      - "${TAKT_HTTP_PORT:-80}:80"
+      - "${TAKT_HTTPS_PORT:-443}:443"
+    volumes:
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      api: {condition: service_healthy}
+
+volumes:
+  postgres-data:
+  caddy-data:
+  caddy-config:

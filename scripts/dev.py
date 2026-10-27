@@ -63,6 +63,8 @@ if args.mode == "check":
         "apps/backend",
         "ruff",
         "check",
+        "--config",
+        "apps/backend/pyproject.toml",
         "apps/backend",
         "scripts",
     )
@@ -74,6 +76,8 @@ if args.mode == "check":
         "ruff",
         "format",
         "--check",
+        "--config",
+        "apps/backend/pyproject.toml",
         "apps/backend",
         "scripts",
     )
