@@ -17,6 +17,8 @@ function filesIn(directory) {
 function inventory(root) {
   const files = filesIn(path.join(root, "docs")).filter((file) => file.endsWith(".md"));
   if (!files.length) throw new Error("No Markdown documents found");
+  const readme = path.join(root, "README.md");
+  if (fs.existsSync(readme)) files.push(readme);
   return new Map(files.map((file) => {
     const source = new TextDecoder("utf-8", { fatal: true }).decode(fs.readFileSync(file));
     const tokens = markdown.parse(source, {});

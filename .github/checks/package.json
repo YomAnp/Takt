@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "check:markdown": "markdownlint-cli2 \"../../docs/**/*.md\"",
+    "check:markdown": "markdownlint-cli2 \"../../README.md\" \"../../docs/**/*.md\"",
     "check:encoding": "node check-docs.mjs encoding",
     "check:links": "node check-docs.mjs links",
     "check:translations": "node check-docs.mjs translations",
