@@ -36,7 +36,7 @@ Overlapping intervals must not count time twice, and repeating a request must no
 
 Event time differs from recording time: an arrival at 08:30 can be entered later. The time zone and day boundary must be explicit, including for intervals crossing midnight. Recalculation after a change to required time must explain which records and rules were used.
 
-The source of the requirement, authority to change it, accounting period, and carry-over of hours determine how rules apply. Eligible breaks, work outside the college, and multiple intervals per day determine credited time. Ordinary and academic hours cannot be mixed without an agreed conversion. These rules, rounding, and treatment of time beyond the requirement need agreement. The correction process, approval requirements, and change history have not been defined either.
+An employee sets their personal required time once and changes it in settings. A new value applies to the current and subsequent days; past days retain their earlier requirement. Breaks have explicit start and end entries and are excluded from credited time. Hours are ordinary hours of 60 minutes.
 
 ## Components and dependencies
 
@@ -66,7 +66,7 @@ HTTP handlers validate the request shape and call an application workflow. The w
 
 The server must verify the authenticity of `initData` using the official algorithm and check the freshness of `auth_date`. Values in `initDataUnsafe` are not a trusted source for authorisation. See [Mini App data validation](https://core.telegram.org/bots/webapps#validating-data-received-via-the-mini-app).
 
-A verified Telegram user is not necessarily a college employee and does not gain access to other people's records through that fact. College membership verification, the session model, and individual record visibility require separate decisions. Supporting one college or several affects data access boundaries.
+Access is open to Telegram users after login data validation. A Telegram account does not itself establish MGRI membership. Employees see their own accounting; administrators manage access and view individual employee records. The administrator role is assigned explicitly, not automatically to the first person signing in.
 
 ## Selected stack
 
@@ -99,18 +99,20 @@ FastAPI operations and Pydantic schemas are the contract source. They produce an
 
 TanStack Query manages loading and freshness of server data, not accounting rules. The wiki explains domain rules and architecture; no separate manual copy of the API specification is maintained. The library's purpose is described in the [TanStack Query overview](https://tanstack.com/query/latest/docs/framework/react/overview).
 
+[Server startup and checks](development/backend.md).
+
 ## Code layout
 
 The directory layout separates application areas with different dependencies and verification needs.
 
 | Path | Purpose |
 | --- | --- |
-| `backend/src/takt/` | Python application package organised by responsibility |
-| `backend/tests/` | Checks for calculations, workflows, access, and the HTTP API |
-| `backend/migrations/` | Alembic migrations, separate from application code |
-| `frontend/src/` | Interface code and Telegram integration |
-| `frontend/src/api/generated/` | Generated client; handwritten API integration code belongs outside this directory |
-| `frontend/tests/` | Checks for the interface and its interaction with the server |
+| `apps/backend/src/takt/` | Python application package organised by responsibility |
+| `apps/backend/tests/` | Checks for calculations, workflows, access, and the HTTP API |
+| `apps/backend/migrations/` | Alembic migrations, separate from application code |
+| `apps/frontend/src/` | Interface code and Telegram integration |
+| `apps/frontend/src/api/generated/` | Generated client; handwritten API integration code belongs outside this directory |
+| `apps/frontend/tests/` | Checks for the interface and its interaction with the server |
 | `docs/ru/`, `docs/en/` | Home page and project overview in both languages |
 
 Tests belong beside the corresponding application area. A path's purpose determines which changes belong there.
@@ -119,7 +121,7 @@ Tests belong beside the corresponding application area. A path's purpose determi
 
 The interface must have a distinct Takt identity, a clear hierarchy of time and actions, deliberate information density, and convenient entry correction. User workflows determine screen composition.
 
-Composition must account for the day's states: not started, accounting in progress, on a break, requirement met, entry needs correction, and server unavailable. Data presentation must consider Telegram's limited width, the on-screen keyboard, theme, accessibility, and reopening the Mini App. Visual styling is undefined; the earlier card mockup is not an accepted reference.
+The interface is designed for phones: a compact people list, clear statuses and actions, and a restrained green accent inspired by ICQ. It accounts for the keyboard, theme, accessibility, and reopening the Mini App. Displaying the timer does not require network requests every second.
 
 ## Documentation maintenance
 
