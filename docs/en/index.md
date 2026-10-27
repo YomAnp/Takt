@@ -2,7 +2,7 @@
 
 [Русский](../ru/index.md)
 
-Takt is a Telegram Mini App for personal time accounting by college employees. Its purpose is to help employees understand how much time has been credited, how much remains, and when the required time will be completed.
+Takt is a Telegram Mini App for personal time accounting by MGRI employees. Its purpose is to help employees understand how much time has been credited, how much remains, and when the required time will be completed.
 
 ## Main workflow
 
@@ -16,12 +16,14 @@ The selected stack is React, TypeScript, and Vite for the client, Python and Fas
 
 | Directory | Purpose |
 | --- | --- |
-| `backend/` | Server: access, time rules, entries, and calculations |
-| `frontend/` | Telegram Mini App interface |
+| `apps/backend/` | Server: access, time rules, entries, and calculations |
+| `apps/frontend/` | Telegram Mini App interface |
 | `docs/ru/` | Russian documentation |
 | `docs/en/` | English documentation |
 
 The [project overview](project.md) explains terminology, a calculation example, the selected stack, and component boundaries.
+
+[Backend development](development/backend.md): PostgreSQL and API startup, storage, and checks.
 
 ## Documentation
 

@@ -1,0 +1,76 @@
+name: Backend
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: backend-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality:
+    name: Backend quality
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    defaults:
+      run:
+        working-directory: apps/backend
+    steps:
+      - uses: actions/checkout@9f698171ed81b15d1823a05fc7211befd50c8ae0 # v6.0.3
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@e797f83bcb11b83ae66e0230d6156d7c80228e7c # v6.0.0
+        with:
+          python-version: 3.12.12
+      - name: Install locked dependencies
+        run: |
+          python -m pip install uv==0.10.2
+          uv sync --frozen --link-mode copy
+      - name: Lint and formatting
+        run: |
+          uv run ruff check . ../../scripts
+          uv run ruff format --check . ../../scripts
+      - name: Type checking
+        run: uv run mypy src
+
+  postgres:
+    name: PostgreSQL integration
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: takt
+          POSTGRES_PASSWORD: takt_test
+          POSTGRES_DB: takt_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U takt -d takt_test"
+          --health-interval 2s
+          --health-timeout 3s
+          --health-retries 20
+    env:
+      TAKT_TEST_DATABASE_URL: postgresql+psycopg://takt:takt_test@127.0.0.1:5432/takt_test
+    defaults:
+      run:
+        working-directory: apps/backend
+    steps:
+      - uses: actions/checkout@9f698171ed81b15d1823a05fc7211befd50c8ae0 # v6.0.3
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@e797f83bcb11b83ae66e0230d6156d7c80228e7c # v6.0.0
+        with:
+          python-version: 3.12.12
+      - name: Install locked dependencies
+        run: |
+          python -m pip install uv==0.10.2
+          uv sync --frozen --link-mode copy
+      - name: Test calculation, migrations and database constraints
+        run: uv run pytest --tb=short
