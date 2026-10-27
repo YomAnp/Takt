@@ -1,8 +1,9 @@
+from datetime import date
 from uuid import UUID
 
 from pydantic import AwareDatetime, BaseModel, ConfigDict, Field
 
-from takt.time_accounting.schemas import CalculationOutput
+from takt.time_accounting.schemas import CalculationOutput, ScheduledCalculationOutput
 
 
 class BreakSnapshot(BaseModel):
@@ -36,4 +37,12 @@ class CheckoutPreview(BaseModel):
 
     attendance: AttendanceSnapshot
     will_end_break: bool
-    summary: CalculationOutput
+    summary: CalculationOutput | ScheduledCalculationOutput
+    proposed_end_at: AwareDatetime
+
+
+class PendingDeparture(BaseModel):
+    attendance: AttendanceSnapshot
+    work_date: date
+    scheduled_end_at: AwareDatetime | None
+    can_use_scheduled_end: bool

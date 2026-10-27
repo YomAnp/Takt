@@ -117,14 +117,14 @@ async def test_complete_day_is_persisted_and_calculated(database):
         database, actor, end_break, "12:30", pause, break_id=pause.attendance.breaks[0].id
     )
     confirmation = await preview(database, actor, resumed, "14:00")
-    assert confirmation.summary.credited_seconds == 300 * 60
-    assert confirmation.summary.remaining_seconds == 60 * 60
+    assert confirmation.summary.credited_seconds == 330 * 60
+    assert confirmation.summary.remaining_seconds == 30 * 60
     assert confirmation.will_end_break is False
     departure = await send(database, actor, check_out, "15:00", resumed, confirmed=True)
     assert departure.attendance.revision == 4
     assert departure.attendance.ended_at == at("15:00")
     result = await summary(database, actor, "17:00")
-    assert result.credited_seconds == 360 * 60
+    assert result.credited_seconds == 390 * 60
     assert result.state == "finished"
     assert await counts(database, actor) == (4, 4)
 
@@ -218,7 +218,7 @@ async def test_departure_during_break_and_undo_restore_both_original_states(data
     arrival = await send(database, actor, check_in, "08:30")
     pause = await send(database, actor, start_break, "12:00", arrival)
     confirmation = await preview(database, actor, pause, "13:00")
-    assert confirmation.summary.credited_seconds == 210 * 60
+    assert confirmation.summary.credited_seconds == 270 * 60
     assert confirmation.will_end_break is True
     departure = await send(database, actor, check_out, "13:00", pause, confirmed=True)
     assert departure.closed_break_id == pause.attendance.breaks[0].id
@@ -228,7 +228,7 @@ async def test_departure_during_break_and_undo_restore_both_original_states(data
     assert reopened.attendance.ended_at is None
     assert reopened.attendance.breaks[0].ended_at is None
     result = await summary(database, actor, "14:00")
-    assert result.credited_seconds == 210 * 60
+    assert result.credited_seconds == 330 * 60
     assert result.state == "on_break"
     assert await counts(database, actor) == (4, 4)
     async with session_factory(database)() as session:

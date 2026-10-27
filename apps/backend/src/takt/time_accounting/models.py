@@ -1,5 +1,5 @@
 import uuid
-from datetime import date, datetime
+from datetime import date, datetime, time
 
 from sqlalchemy import (
     BigInteger,
@@ -10,6 +10,7 @@ from sqlalchemy import (
     ForeignKey,
     Integer,
     String,
+    Time,
     UniqueConstraint,
     func,
     text,
@@ -106,3 +107,13 @@ class CommandReceipt(Base):
     parameters: Mapped[dict[str, object]] = mapped_column(JSONB)
     result: Mapped[dict[str, object]] = mapped_column(JSONB)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class WorkSchedule(Base):
+    __tablename__ = "work_schedules"
+    __table_args__ = (UniqueConstraint("user_id", "effective_from"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID, primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"))
+    effective_from: Mapped[date] = mapped_column(Date)
+    end_time: Mapped[time] = mapped_column(Time)

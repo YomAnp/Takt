@@ -57,9 +57,9 @@ async def test_persisted_intervals_produce_expected_summary(database):
     owner = await add_user(database)
     await add_attendance(database, owner)
     result = await read(database, owner, owner)
-    assert result.credited_seconds == 15000
+    assert result.credited_seconds == 16800
     assert result.break_seconds == 1800
-    assert result.estimated_completion_at == at("15:00")
+    assert result.estimated_completion_at == at("14:30")
 
 
 @pytest.mark.asyncio
@@ -119,7 +119,7 @@ async def test_admin_can_read_individual_accounting_but_member_cannot(database):
     member = await add_user(database)
     admin = await add_user(database, role="admin")
     await add_attendance(database, owner)
-    assert (await read(database, admin, owner)).credited_seconds == 15000
+    assert (await read(database, admin, owner)).credited_seconds == 16800
     with pytest.raises(AccessDenied):
         await read(database, member, owner)
     disabled_admin = await add_user(database, role="admin", active=False)
@@ -189,8 +189,8 @@ async def test_distinct_users_can_attend_at_the_same_time(database):
     second = await add_user(database)
     await add_attendance(database, first)
     await add_attendance(database, second)
-    assert (await read(database, first, first)).credited_seconds == 15000
-    assert (await read(database, second, second)).credited_seconds == 15000
+    assert (await read(database, first, first)).credited_seconds == 16800
+    assert (await read(database, second, second)).credited_seconds == 16800
 
 
 @pytest.mark.asyncio

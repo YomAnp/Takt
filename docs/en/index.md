@@ -2,13 +2,13 @@
 
 [Русский](../ru/index.md)
 
-Takt is a Telegram Mini App for personal time accounting by MGRI employees. Its purpose is to help employees understand how much time has been credited, how much remains, and when the required time will be completed.
+Takt is a Telegram Mini App for personal time accounting for MGRI employees. It helps users see total attendance, their selected working-day end time, and time beyond that point.
 
 ## Main workflow
 
-An employee sets their required attendance time and records their arrival. Entries and applicable rules determine credited time, remaining time, and estimated completion time. The workflow includes finishing the day, correcting entries, and reviewing history and statistics based on personal records.
+An employee saves a working-day end time and records arrival and departure. Delayed entries use the actual event time. Total attendance includes breaks, which users can record separately for themselves. Calculation rules, missed entries, and first launch are described in the [accounting workflows](product/time-accounting.md).
 
-Personal time accounting is not equivalent to an official timesheet or proof of physical presence. Access to colleagues' records and administrative authority require separate definition.
+Personal accounting does not replace an official timesheet or prove physical presence. Employees see their own entries; administrators manage access and view individual accounting.
 
 ## Project structure
 
@@ -21,7 +21,7 @@ The selected stack is React, TypeScript, and Vite for the client, Python and Fas
 | `docs/ru/` | Russian documentation |
 | `docs/en/` | English documentation |
 
-The [project overview](project.md) explains terminology, a calculation example, the selected stack, and component boundaries.
+The [project overview](project.md) explains the selected stack and component boundaries.
 
 [Backend development](development/backend.md): PostgreSQL and API startup, storage, and checks.
 
