@@ -10,6 +10,7 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="TAKT_", extra="ignore", hide_input_in_errors=True)
 
     bot_token: SecretStr | None = None
+    bot_username: str = ""
     superadmin_username: str = ""
     public_url: str = "http://localhost:5173"
     time_zone: str = "Europe/Moscow"

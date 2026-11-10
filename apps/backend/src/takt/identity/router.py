@@ -74,9 +74,11 @@ async def login(body: LoginInput, request: Request, response: Response) -> Login
                 telegram_id=identity.id,
                 display_name=identity.name,
                 telegram_username=identity.username,
+                photo_url=identity.photo_url,
             )
             .on_conflict_do_update(
-                index_elements=[User.telegram_id], set_={"telegram_username": identity.username}
+                index_elements=[User.telegram_id],
+                set_={"telegram_username": identity.username, "photo_url": identity.photo_url},
             )
         )
         user = await session.scalar(
@@ -163,9 +165,15 @@ async def preferences(
             before.display_name != body.display_name
             or before.end_time != body.end_time
             or not before.onboarded
+            or (
+                body.leaderboard_enabled is not None
+                and body.leaderboard_enabled != user.leaderboard_enabled
+            )
         ):
             user.display_name = body.display_name
             user.onboarded_at = user.onboarded_at or clock
+            if body.leaderboard_enabled is not None:
+                user.leaderboard_enabled = body.leaderboard_enabled
             await session.execute(
                 insert(WorkSchedule)
                 .values(user_id=user.id, effective_from=effective, end_time=body.end_time)
@@ -183,6 +191,7 @@ async def preferences(
                         "end_time": body.end_time.isoformat(),
                         "display_name": body.display_name,
                         "effective_from": effective.isoformat(),
+                        "leaderboard_enabled": user.leaderboard_enabled,
                     },
                 )
             )

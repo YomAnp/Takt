@@ -9,6 +9,8 @@ from sqlalchemy.exc import SQLAlchemyError
 from takt.config import Settings
 from takt.database import create_database
 from takt.identity.router import router as identity_router
+from takt.social.errors import SocialError
+from takt.social.router import router as social_router
 from takt.time_accounting.access import AccessDenied
 from takt.time_accounting.commands import CommandConflict, ConfirmationRequired, RecordNotFound
 from takt.time_accounting.personal import router as personal_router
@@ -38,6 +40,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(router)
     app.include_router(identity_router)
     app.include_router(personal_router)
+    app.include_router(social_router)
 
     @app.middleware("http")
     async def private_responses(
@@ -51,6 +54,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     @app.exception_handler(AccessDenied)
     async def denied(request: Request, exc: AccessDenied) -> JSONResponse:
         return JSONResponse(status_code=403, content={"detail": {"code": "account_disabled"}})
+
+    @app.exception_handler(SocialError)
+    async def social_error(request: Request, exc: SocialError) -> JSONResponse:
+        return JSONResponse(status_code=exc.status, content={"detail": {"code": exc.code}})
 
     @app.exception_handler(CommandConflict)
     async def conflict(request: Request, exc: CommandConflict) -> JSONResponse:
@@ -82,7 +89,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         try:
             async with request.app.state.database.connect() as connection:
                 await connection.execute(
-                    text("SELECT 1 FROM work_schedules, auth_sessions, owner_binding LIMIT 0")
+                    text(
+                        "SELECT 1 FROM work_schedules, auth_sessions, "
+                        "owner_binding, friend_requests LIMIT 0"
+                    )
                 )
         except SQLAlchemyError:
             raise HTTPException(status_code=503, detail="Database is not ready.") from None

@@ -1,6 +1,7 @@
 import {
-  ArrowRight,
   CalendarDays,
+  ChevronDown,
+  Cigarette,
   Coffee,
   LogOut,
   Play,
@@ -39,20 +40,36 @@ export function DayView({
     send,
     mutation,
     failed,
+    serverNow,
   } = account;
+  const smoking = pause && "kind" in pause && pause.kind === "smoke";
+  const status = state.isPending
+    ? "Загружаем день"
+    : pause
+      ? smoking
+        ? "На перекуре"
+        : "На перерыве"
+      : current
+        ? "На работе"
+        : total > 0
+          ? "День завершён"
+          : "День не начат";
+  const activeBreakSeconds = pause
+    ? Math.max(
+        0,
+        Math.floor(
+          (Date.parse(serverNow) - Date.parse(pause.started_at)) / 1000,
+        ),
+      )
+    : 0;
   return (
-    <section className="day">
-      <div className="day-heading">
-        <div>
-          <p className="greeting">
-            Здравствуйте, {profile.display_name.split(" ")[0]}
-          </p>
-          <h1>Мой день</h1>
-        </div>
+    <section className="day" aria-labelledby="day-title">
+      <div className="screen-heading">
+        <h1 id="day-title">Мой день</h1>
         <span className="date-chip">
           {new Intl.DateTimeFormat("ru", {
             day: "numeric",
-            month: "short",
+            month: "long",
             timeZone: zone,
           }).format(new Date(data?.now || Date.now()))}
         </span>
@@ -67,15 +84,14 @@ export function DayView({
       )}
       {pending ? (
         <div className="recovery">
-          <span className="status-dot amber" />
-          <h2>Когда закончился прошлый день?</h2>
+          <h2>Остался незавершённый день</h2>
           <p>
-            Уход за{" "}
+            Уточните уход за{" "}
             {new Intl.DateTimeFormat("ru", {
               day: "numeric",
               month: "long",
-            }).format(new Date(pending.work_date + "T12:00:00"))}{" "}
-            не отмечен. Уточните время, и можно начинать новый день.
+            }).format(new Date(pending.work_date + "T12:00:00"))}
+            , чтобы начать сегодняшний.
           </p>
           <button
             className="primary"
@@ -83,92 +99,114 @@ export function DayView({
             onClick={() => open("recover")}
           >
             Указать время ухода
-            <ArrowRight size={18} />
           </button>
         </div>
       ) : (
         <>
-          <div className={"presence-status " + (pause ? "break-status" : "")}>
-            <span className={"status-dot " + (!current ? "quiet" : "")} />
-            {state.isPending
-              ? "Загружаем день"
-              : pause
-                ? "На перерыве"
-                : current
-                  ? "На работе"
-                  : total > 0
-                    ? "День завершён"
-                    : "Всё готово к началу"}
-          </div>
-          <div className={"clock-face " + (current ? "active" : "")}>
-            {Array.from({ length: 12 }, (_, index) => (
-              <i
-                className="clock-tick"
-                style={{ transform: "rotate(" + index * 30 + "deg)" }}
-                key={index}
-              />
-            ))}
-            <div className="clock-content">
-              <span>Сегодня</span>
-              <strong aria-label="Общее время присутствия">
-                {duration(total, true)}
+          <div className={"time-summary " + (current ? "is-working" : "")}>
+            <div className="clock-face" aria-label="Учёт времени сегодня">
+              <div
+                className={"presence-status " + (pause ? "break-status" : "")}
+              >
+                <span className={"status-dot " + (!current ? "quiet" : "")} />
+                {smoking && <Cigarette aria-hidden="true" size={15} />}
+                <span>{status}</span>
+              </div>
+              <strong
+                className="attendance-time"
+                aria-label="Общее время присутствия"
+              >
+                {state.isPending && !data ? "—" : duration(total, true)}
               </strong>
-              <span>
+              <span className="clock-caption">
                 {current
-                  ? "день продолжается"
+                  ? "учтено сегодня"
                   : total > 0
                     ? "время сохранено"
-                    : "время для вашего дня"}
+                    : "до начала дня"}
               </span>
+              <div className="time-meta">
+                <span>Сегодня</span>
+                <span>
+                  До <strong>{profile.end_time?.slice(0, 5)}</strong>
+                </span>
+              </div>
             </div>
-            <span className="dial-dot" />
-          </div>
-          <div className="end-time">
-            <span>Окончание дня</span>
-            <strong>{profile.end_time?.slice(0, 5)}</strong>
           </div>
           <button
             className="primary main-action"
             disabled={busy || !data || !!state.error}
             onClick={() => open(current ? "finish" : "start")}
           >
-            {current ? <LogOut size={20} /> : <Play size={20} />}
+            {current ? (
+              <LogOut aria-hidden="true" size={20} />
+            ) : (
+              <Play aria-hidden="true" size={20} />
+            )}
             <span>{current ? "Завершить день" : "Отметиться"}</span>
           </button>
           {current && (
-            <button
-              className="break-action"
-              disabled={busy}
-              onClick={() =>
-                send(
-                  pause ? "end_break" : "start_break",
-                  pause ? { break_id: pause.id } : {},
-                )
-              }
+            <div
+              className={"break-controls " + (pause ? "has-active-break" : "")}
             >
-              <Coffee size={18} />
-              {pause ? "Вернуться с перерыва" : "Отметить перерыв"}
-            </button>
+              {pause ? (
+                <button
+                  className="break-action"
+                  disabled={busy}
+                  onClick={() => send("end_break", { break_id: pause.id })}
+                >
+                  {smoking ? (
+                    <Cigarette aria-hidden="true" size={19} />
+                  ) : (
+                    <Coffee aria-hidden="true" size={19} />
+                  )}
+                  <span>
+                    Вернуться
+                    {activeBreakSeconds ? (
+                      <small>
+                        {duration(activeBreakSeconds)} на{" "}
+                        {smoking ? "перекуре" : "перерыве"}
+                      </small>
+                    ) : null}
+                  </span>
+                </button>
+              ) : (
+                <>
+                  <button
+                    className="break-action"
+                    disabled={busy}
+                    onClick={() => send("start_break")}
+                  >
+                    <Coffee aria-hidden="true" size={18} />
+                    Перерыв
+                  </button>
+                  <button
+                    className="break-action"
+                    disabled={busy}
+                    onClick={() => send("start_break", { break_kind: "smoke" })}
+                  >
+                    <Cigarette aria-hidden="true" size={18} />
+                    На перекур
+                  </button>
+                </>
+              )}
+            </div>
           )}
-          {!current && data?.last_finished && (
-            <button
-              className="break-action"
-              disabled={busy}
-              onClick={() => {
-                if (
-                  window.confirm(
-                    "Отменить последний уход и продолжить этот день?",
-                  )
-                )
-                  send("reopen", {
-                    attendance_id: data.last_finished!.id,
-                    expected_revision: data.last_finished!.revision,
-                  });
-              }}
-            >
-              <Undo2 size={16} />
-              Отменить последний уход
-            </button>
+          {summary && (
+            <div className="day-details">
+              <span>
+                Перерывы{" "}
+                <strong>
+                  {duration((summary.break_seconds || 0) + (pause ? live : 0))}
+                </strong>
+              </span>
+              <span>
+                После окончания{" "}
+                <strong>
+                  {duration((summary.overtime_seconds || 0) + extraLive)}
+                </strong>
+              </span>
+            </div>
           )}
         </>
       )}
@@ -182,47 +220,41 @@ export function DayView({
           Повторить то же действие
         </button>
       )}
-      <div className="day-journal">
-        <div className="section-heading">
-          <h2>Отметки дня</h2>
-          <span>{current ? "Сохранены" : ""}</span>
-        </div>
+      <details className="day-journal">
+        <summary>
+          <span>{pending ? "Незавершённый день" : "Отметки дня"}</span>
+          <ChevronDown aria-hidden="true" size={18} />
+        </summary>
         {current || lastToday ? (
           <Timeline record={current || lastToday!} zone={zone} />
         ) : (
           <div className="empty-journal">
-            <CalendarDays size={20} />
-            <p>
-              Отметьте приход, когда будете готовы.
-              <br />
-              <span>Можно указать, что пришли раньше.</span>
-            </p>
+            <CalendarDays aria-hidden="true" size={19} />
+            <p>Здесь появятся приход, перерывы и уход.</p>
           </div>
         )}
-      </div>
-      {summary && !pending && (
-        <div className="day-details">
-          <span>
-            Перерывы{" "}
-            <strong>
-              {duration(
-                (summary.break_seconds || 0) + (pause && !pending ? live : 0),
-              )}
-            </strong>
-          </span>
-          <span>
-            После окончания{" "}
-            <strong>
-              {duration((summary.overtime_seconds || 0) + extraLive)}
-            </strong>
-          </span>
-        </div>
-      )}
-      <p className="quiet-note">
-        Перерывы входят в общее время.
-        <br />
-        Отмечайте их, если хотите видеть в статистике.
-      </p>
+        {!current && data?.last_finished && (
+          <button
+            className="text-button undo-action"
+            disabled={busy}
+            onClick={() => {
+              if (
+                window.confirm(
+                  "Отменить последний уход и продолжить этот день?",
+                )
+              )
+                send("reopen", {
+                  attendance_id: data.last_finished!.id,
+                  expected_revision: data.last_finished!.revision,
+                });
+            }}
+          >
+            <Undo2 aria-hidden="true" size={17} />
+            Отменить последний уход
+          </button>
+        )}
+      </details>
+      <p className="quiet-note">Перерывы входят в общее время.</p>
     </section>
   );
 }
@@ -236,9 +268,14 @@ function Timeline({
   const events = [
     { time: record.started_at, label: "Приход", kind: "arrival" },
     ...record.breaks.flatMap((item) => [
-      { time: item.started_at, label: "Перерыв", kind: "break" },
+      {
+        time: item.started_at,
+        label:
+          "kind" in item && item.kind === "smoke" ? "На перекур" : "Перерыв",
+        kind: "break",
+      },
       ...(item.ended_at
-        ? [{ time: item.ended_at, label: "Перерыв завершён", kind: "break" }]
+        ? [{ time: item.ended_at, label: "Вернулся", kind: "break" }]
         : []),
     ]),
     ...(record.ended_at

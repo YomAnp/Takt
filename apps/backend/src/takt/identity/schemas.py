@@ -11,6 +11,8 @@ class Profile(BaseModel):
     display_name: str
     telegram_id: int | None
     telegram_username: str | None
+    photo_url: str | None = None
+    leaderboard_enabled: bool = False
     role: Literal["member", "admin", "superadmin"]
     is_active: bool
     onboarded: bool = False
@@ -31,6 +33,7 @@ class Preferences(BaseModel):
     model_config = ConfigDict(extra="forbid")
     display_name: str = Field(min_length=1, max_length=80)
     end_time: time
+    leaderboard_enabled: bool | None = Field(default=None, strict=True)
 
     @field_validator("display_name")
     @classmethod

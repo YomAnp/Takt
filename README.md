@@ -25,6 +25,8 @@ python3 scripts/host.py setup
 В папке проекта:
 
 ```sh
-git pull --ff-only
-python3 scripts/host.py up
+python3 scripts/host.py update
 ```
+
+Команда получает свежий `main`, собирает новую версию и применяет миграции.
+Настройки и данные сохраняются. Перед миграциями установщик создаёт резервную копию БД.

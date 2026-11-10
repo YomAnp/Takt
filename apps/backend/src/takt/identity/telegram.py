@@ -5,7 +5,7 @@ import hmac
 import json
 from dataclasses import dataclass
 from datetime import datetime
-from urllib.parse import parse_qsl
+from urllib.parse import parse_qsl, urlsplit
 
 
 class InvalidTelegramData(ValueError):
@@ -17,6 +17,7 @@ class TelegramIdentity:
     id: int
     name: str
     username: str | None
+    photo_url: str | None = None
 
 
 def verify_init_data(raw: str, token: str, now: datetime) -> TelegramIdentity:
@@ -50,7 +51,24 @@ def verify_init_data(raw: str, token: str, now: datetime) -> TelegramIdentity:
             raise ValueError
         if username is not None and not isinstance(username, str):
             raise ValueError
-        name = " ".join((first + " " + last).split())[:80] or "Сотрудник"
-        return TelegramIdentity(identifier, name, username)
+        name = (
+            " ".join(
+                "".join(c for c in first + " " + last if ord(c) >= 32 and ord(c) != 127).split()
+            )[:80]
+            or "Сотрудник"
+        )
+        photo = user.get("photo_url")
+        if not isinstance(photo, str) or len(photo) > 2048 or any(ord(c) < 32 for c in photo):
+            photo = None
+        if photo:
+            parsed = urlsplit(photo)
+            if (
+                parsed.scheme != "https"
+                or not parsed.hostname
+                or parsed.username
+                or parsed.password
+            ):
+                photo = None
+        return TelegramIdentity(identifier, name, username, photo)
     except (ValueError, KeyError, TypeError, OverflowError) as exc:
         raise InvalidTelegramData("Invalid or expired Telegram launch data.") from exc

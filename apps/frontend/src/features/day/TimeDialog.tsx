@@ -30,6 +30,7 @@ export function TimeDialog({ account }: { account: TimeAccounting }) {
   if (!dialog) return null;
   return (
     <Sheet
+      canClose={!mutation.isPending}
       title={
         dialog === "start"
           ? "Начать рабочий день"
@@ -86,6 +87,8 @@ export function TimeDialog({ account }: { account: TimeAccounting }) {
               Дата и время ({zone})
               <input
                 type="datetime-local"
+                name="occurred_at"
+                autoComplete="off"
                 required
                 value={chosen}
                 onChange={(event) => setChosen(event.target.value)}

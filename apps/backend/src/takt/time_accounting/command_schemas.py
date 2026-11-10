@@ -1,4 +1,5 @@
 from datetime import date
+from typing import Literal
 from uuid import UUID
 
 from pydantic import AwareDatetime, BaseModel, ConfigDict, Field
@@ -12,6 +13,7 @@ class BreakSnapshot(BaseModel):
     id: UUID
     started_at: AwareDatetime
     ended_at: AwareDatetime | None
+    kind: Literal["regular", "smoke"] = "regular"
 
 
 class AttendanceSnapshot(BaseModel):

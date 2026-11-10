@@ -38,19 +38,37 @@ The bot responds to `/start` and `/help` in private chats. It uses one long-poll
 
 ## Updates and maintenance
 
-After obtaining a new source version:
+For an existing Takt installation, run from the project directory:
 
 ```sh
+git pull --ff-only
 python3 scripts/host.py up
+```
+
+Settings from `.env.host`, the database password, users, and entries are retained. Images are built before stopping the application. The API and bot then pause, a database backup is created, migrations are applied, and the new version starts. Updating does not ask for the domain, token, or owner again.
+
+After the first update, one command can fetch a new version from `origin/main` and run its installer:
+
+```sh
+python3 scripts/host.py update
+```
+
+The command requires a clean `main` branch and permits only a fast-forward. Local source edits and custom commits are retained; when present, update the sources manually. For an archive-based installation, obtain the new sources and use `up`.
+
+The Docker project name is stored in `TAKT_PROJECT_NAME`. If an older installation used `--project`, pass the same name on its first update; subsequent commands use the saved value. Concurrent installation commands for one configuration are blocked.
+
+```sh
 python3 scripts/host.py status
 python3 scripts/host.py logs
 python3 scripts/host.py backup
 python3 scripts/host.py stop
 ```
 
-Updating rebuilds the application and applies migrations while retaining PostgreSQL data and certificates. Backups are created under `backups/` in `pg_dump -Fc` format; the directory is excluded from Git. Keep copies outside the server as well.
+Backups are created under `backups/` in `pg_dump -Fc` format; an incomplete file does not become a completed backup. The directory is excluded from Git. Keep copies outside the server as well.
 
-The `--config` and `--project` parameters select a separate settings file and installation name. A separate configuration supports container checks over HTTP:
+If backup creation fails, the previous containers resume. If a migration fails, the API and bot remain stopped; the backup path is printed in the terminal. Fix the cause and repeat `up`. Data and certificates remain in their existing volumes.
+
+The `--config` and `--project` parameters select a separate settings file and name for a new installation. A separate configuration supports container checks over HTTP:
 
 ```sh
 python3 scripts/host.py setup --local --config .env.host.local --project takt-local --port 8080

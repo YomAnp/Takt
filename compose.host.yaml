@@ -5,6 +5,7 @@ x-backend: &backend
   environment: &environment
     TAKT_DATABASE_URL: postgresql+psycopg://takt:${TAKT_POSTGRES_PASSWORD:?Run host.py setup first}@db:5432/takt
     TAKT_BOT_TOKEN: ${TAKT_BOT_TOKEN:-}
+    TAKT_BOT_USERNAME: ${TAKT_BOT_USERNAME:-}
     TAKT_SUPERADMIN_USERNAME: ${TAKT_SUPERADMIN_USERNAME:-}
     TAKT_PUBLIC_URL: ${TAKT_PUBLIC_URL:?Set public URL}
     TAKT_TIME_ZONE: ${TAKT_TIME_ZONE:-Europe/Moscow}

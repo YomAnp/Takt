@@ -13,6 +13,7 @@ import sys
 import time
 import urllib.error
 import urllib.request
+from contextlib import contextmanager
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -184,136 +185,79 @@ def compose(config: Path, project: str, *args: str) -> None:
     )
 
 
-def main(argv: list[str] | None = None) -> None:
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument(
-        "action",
-        choices=["setup", "up", "status", "logs", "stop", "backup", "configure-bot"],
+def compose_output(config: Path, project: str, *args: str) -> str:
+    result = subprocess.run(
+        [
+            "docker",
+            "compose",
+            "--project-name",
+            project,
+            "--env-file",
+            str(config),
+            "-f",
+            str(ROOT / "compose.host.yaml"),
+            *args,
+        ],
+        cwd=ROOT,
+        check=True,
+        capture_output=True,
+        text=True,
     )
-    parser.add_argument("--config", type=Path, default=ROOT / ".env.host")
-    parser.add_argument("--project", default="takt-host")
-    parser.add_argument(
-        "--local",
-        action="store_true",
-        help="HTTP smoke-test installation, without Telegram registration",
-    )
-    parser.add_argument("--port", type=int, default=8080, help="HTTP port for --local")
-    args = parser.parse_args(argv)
-    if not re.fullmatch(r"[a-z0-9][a-z0-9_-]{0,39}", args.project):
-        raise SetupError("Use a lowercase Docker project name.")
-    if not 1 <= args.port < 65535:
-        raise SetupError("Invalid local port.")
-    if shutil.which("docker") is None:
-        raise SetupError(
-            "Install Docker Engine and its Compose plugin: https://docs.docker.com/engine/install/"
-        )
-    subprocess.run(["docker", "compose", "version"], check=True)
-    subprocess.run(["docker", "info", "--format", "{{.ServerVersion}}"], check=True)
-    config = args.config.expanduser().resolve()
-    values = read_env(config)
-    if args.action == "setup":
-        if args.local:
-            if values.get("TAKT_PUBLIC_URL", "").startswith("https://"):
-                raise SetupError(
-                    "Use a separate --config for local checks; this file configures production."
-                )
-            values.update(
-                TAKT_SITE_ADDRESS=":80",
-                TAKT_PUBLIC_URL="http://127.0.0.1:" + str(args.port),
-                TAKT_HTTP_PORT=str(args.port),
-                TAKT_HTTPS_PORT=str(args.port + 1),
-                TAKT_BOT_TOKEN="",
-                TAKT_SUPERADMIN_USERNAME="",
-            )
+    return result.stdout.strip()
+
+
+@contextmanager
+def installation_lock(config: Path):
+    """Serialize an installation without leaving a stale lock after a process exits."""
+    path = config.with_name(config.name + ".lock")
+    descriptor = os.open(path, os.O_CREAT | os.O_RDWR, 0o600)
+    locked = False
+    try:
+        if os.name == "nt":
+            import msvcrt
+
+            if os.fstat(descriptor).st_size == 0:
+                os.write(descriptor, b"0")
+            os.lseek(descriptor, 0, os.SEEK_SET)
+            try:
+                msvcrt.locking(descriptor, msvcrt.LK_NBLCK, 1)
+                locked = True
+            except OSError:
+                raise SetupError("Another installation command is already running.") from None
         else:
-            previous = values.get("TAKT_SITE_ADDRESS", "")
-            host = domain_name(
-                input("Domain" + (" [" + previous + "]" if previous else "") + ": ") or previous
-            )
-            token = getpass.getpass(
-                "Bot token (hidden; Enter keeps the saved token): "
-            ) or values.get("TAKT_BOT_TOKEN", "")
-            if not re.fullmatch(r"[0-9]+:[A-Za-z0-9_-]{20,}", token):
-                raise SetupError("Invalid bot token format.")
-            previous_owner = values.get("TAKT_SUPERADMIN_USERNAME", "")
-            owner = owner_name(
-                input(
-                    "Owner @username"
-                    + (" [" + previous_owner + "]" if previous_owner else "")
-                    + ": "
-                )
-                or previous_owner
-            )
-            identity = bot_call(token, "getMe")
-            webhook = bot_call(token, "getWebhookInfo")
-            if not isinstance(identity, dict) or not identity.get("is_bot"):
-                raise SetupError("This token does not identify a bot.")
-            if not isinstance(webhook, dict) or webhook.get("url"):
-                raise SetupError(
-                    "This bot already has a webhook. "
-                    "Use a dedicated bot or remove its webhook explicitly before setup."
-                )
-            print("Bot: @" + str(identity.get("username", "")))
-            values.update(
-                TAKT_SITE_ADDRESS=host,
-                TAKT_PUBLIC_URL="https://" + host,
-                TAKT_HTTP_PORT="80",
-                TAKT_HTTPS_PORT="443",
-                TAKT_BOT_TOKEN=token,
-                TAKT_SUPERADMIN_USERNAME=owner,
-            )
-        values.setdefault("TAKT_POSTGRES_PASSWORD", secrets.token_hex(32))
-        values.setdefault("TAKT_TIME_ZONE", "Europe/Moscow")
-        save_env(config, values)
-        print("Configuration saved:", config)
-    if not values:
-        raise SetupError("Run 'python3 scripts/host.py setup' first.")
-    production = values.get("TAKT_PUBLIC_URL", "").startswith("https://")
-    profile = ("--profile", "telegram") if production else ()
-    if args.action in {"setup", "up"}:
-        compose(config, args.project, "build", "api", "web")
-        # Explicit migration on every update, including when a previous migrate container exited.
-        compose(config, args.project, "up", "-d", "--wait", "db")
-        compose(config, args.project, "run", "--rm", "--no-deps", "migrate")
-        compose(config, args.project, "up", "-d", "--wait", "api", "web")
-        verify_public_url(values["TAKT_PUBLIC_URL"])
-        if production:
-            configure_bot(values)
-            compose(config, args.project, *profile, "up", "-d", "bot")
-        print("Takt is ready:", values["TAKT_PUBLIC_URL"])
-        if production:
-            print(
-                "Open the bot as @"
-                + values["TAKT_SUPERADMIN_USERNAME"]
-                + " to bind the owner's verified Telegram ID."
-            )
-            print(
-                "The optional main profile Mini App shortcut is configured in @BotFather. "
-                "The chat menu button is already configured."
-            )
-    elif args.action == "configure-bot":
-        if not production:
-            raise SetupError("Telegram requires the production HTTPS configuration.")
-        verify_public_url(values["TAKT_PUBLIC_URL"])
-        configure_bot(values)
-        print("Telegram menu and commands configured.")
-    elif args.action == "status":
-        compose(config, args.project, *profile, "ps", "-a")
-    elif args.action == "logs":
-        compose(config, args.project, *profile, "logs", "--tail", "100")
-    elif args.action == "stop":
-        compose(config, args.project, *profile, "stop")
-    elif args.action == "backup":
-        destination = ROOT / "backups"
-        destination.mkdir(exist_ok=True)
-        target = destination / ("takt-" + time.strftime("%Y%m%d-%H%M%S", time.gmtime()) + ".dump")
-        with target.open("xb") as output:
+            import fcntl
+
+            try:
+                fcntl.flock(descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                locked = True
+            except OSError:
+                raise SetupError("Another installation command is already running.") from None
+        yield
+    finally:
+        if locked:
+            if os.name == "nt":
+                os.lseek(descriptor, 0, os.SEEK_SET)
+                msvcrt.locking(descriptor, msvcrt.LK_UNLCK, 1)
+            else:
+                fcntl.flock(descriptor, fcntl.LOCK_UN)
+        os.close(descriptor)
+
+
+def database_backup(config: Path, project: str) -> Path:
+    destination = ROOT / "backups"
+    destination.mkdir(exist_ok=True)
+    stamp = time.strftime("%Y%m%d-%H%M%S", time.gmtime())
+    target = destination / f"{project}-{stamp}-{secrets.token_hex(3)}.dump"
+    partial = target.with_suffix(".dump.partial")
+    descriptor = os.open(partial, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    try:
+        with os.fdopen(descriptor, "wb") as output:
             subprocess.run(
                 [
                     "docker",
                     "compose",
                     "--project-name",
-                    args.project,
+                    project,
                     "--env-file",
                     str(config),
                     "-f",
@@ -332,8 +276,278 @@ def main(argv: list[str] | None = None) -> None:
                 stdout=output,
                 check=True,
             )
-        os.chmod(target, 0o600)
+        with partial.open("rb") as source:
+            if source.read(5) != b"PGDMP":
+                raise SetupError("Database backup is incomplete; migration was not started.")
+        partial.replace(target)
         print("Backup:", target)
+        return target
+    finally:
+        partial.unlink(missing_ok=True)
+
+
+def git_output(*args: str) -> str:
+    return subprocess.check_output(["git", *args], cwd=ROOT, text=True).strip()
+
+
+def update_checkout() -> None:
+    """Fast-forward only; local source edits and commits are never discarded."""
+    if shutil.which("git") is None:
+        raise SetupError("Install Git before updating the source checkout.")
+    if git_output("branch", "--show-current") != "main":
+        raise SetupError(
+            "Automatic updates require the main branch. Keep custom branches manually."
+        )
+    if git_output("status", "--porcelain", "--untracked-files=no"):
+        raise SetupError("Source files contain local changes. Commit or save them before updating.")
+    subprocess.run(["git", "fetch", "origin", "main"], cwd=ROOT, check=True)
+    result = subprocess.run(
+        ["git", "merge-base", "--is-ancestor", "HEAD", "FETCH_HEAD"],
+        cwd=ROOT,
+        capture_output=True,
+    )
+    if result.returncode:
+        raise SetupError("Local main contains commits absent from origin/main; update it manually.")
+    subprocess.run(["git", "merge", "--ff-only", "FETCH_HEAD"], cwd=ROOT, check=True)
+
+
+def ensure_bot_username(config: Path, values: dict[str, str]) -> None:
+    if not values.get("TAKT_BOT_TOKEN") or values.get("TAKT_BOT_USERNAME"):
+        return
+    identity = bot_call(values["TAKT_BOT_TOKEN"], "getMe")
+    if not isinstance(identity, dict) or not identity.get("is_bot") or not identity.get("username"):
+        raise SetupError("The saved token does not identify a bot with a username.")
+    values["TAKT_BOT_USERNAME"] = str(identity["username"])
+    save_env(config, values)
+
+
+def deploy(config: Path, project: str, values: dict[str, str], *, setup: bool) -> None:
+    production = values.get("TAKT_PUBLIC_URL", "").startswith("https://")
+    profile = ("--profile", "telegram") if production else ()
+    ensure_bot_username(config, values)
+    # A failed build leaves the running application untouched.
+    compose(config, project, "build", "api", "web")
+    compose(config, project, "up", "-d", "--wait", "db")
+    running = set(
+        compose_output(
+            config, project, *profile, "ps", "--services", "--status", "running"
+        ).splitlines()
+    )
+    writers = [name for name in ("api", "bot") if name in running]
+    if writers:
+        compose(config, project, *profile, "stop", *writers)
+    backup = None
+    try:
+        initialized = (
+            compose_output(
+                config,
+                project,
+                "exec",
+                "-T",
+                "db",
+                "psql",
+                "-U",
+                "takt",
+                "-d",
+                "takt",
+                "-tAc",
+                "SELECT to_regclass('public.alembic_version') IS NOT NULL",
+            )
+            == "t"
+        )
+        if initialized:
+            backup = database_backup(config, project)
+    except (Exception, KeyboardInterrupt):
+        # The schema has not changed, so the previous containers can resume safely.
+        if writers:
+            compose(config, project, *profile, "start", *writers)
+        raise
+    try:
+        compose(config, project, "run", "--rm", "--no-deps", "migrate")
+    except subprocess.CalledProcessError:
+        location = str(backup) if backup is not None else "No previous schema was present."
+        raise SetupError(
+            "Database migration failed. API and bot remain stopped. Backup: "
+            + location
+            + ". Fix the migration and run 'python3 scripts/host.py up' again."
+        ) from None
+    # Dependencies are already ready; a second migration is not started by Compose.
+    compose(config, project, "up", "-d", "--wait", "--no-deps", "api", "web")
+    verify_public_url(values["TAKT_PUBLIC_URL"])
+    if production:
+        if setup:
+            configure_bot(values)
+        compose(config, project, *profile, "up", "-d", "--no-deps", "bot")
+    print("Takt is ready:", values["TAKT_PUBLIC_URL"])
+
+
+def configured_project(explicit: str | None, values: dict[str, str]) -> str:
+    saved = values.get("TAKT_PROJECT_NAME")
+    if explicit and saved and explicit != saved:
+        raise SetupError(
+            "This configuration belongs to another Docker project. Use a separate --config."
+        )
+    project = explicit or saved or "takt-host"
+    if not re.fullmatch(r"[a-z0-9][a-z0-9_-]{0,39}", project):
+        raise SetupError("Use a lowercase Docker project name.")
+    return project
+
+
+def setup_values(config: Path, values: dict[str, str], args: argparse.Namespace) -> None:
+    if args.local:
+        if values.get("TAKT_PUBLIC_URL", "").startswith("https://"):
+            raise SetupError(
+                "Use a separate --config for local checks; this file configures production."
+            )
+        values.update(
+            TAKT_SITE_ADDRESS=":80",
+            TAKT_PUBLIC_URL="http://127.0.0.1:" + str(args.port),
+            TAKT_HTTP_PORT=str(args.port),
+            TAKT_HTTPS_PORT=str(args.port + 1),
+            TAKT_BOT_TOKEN="",
+            TAKT_BOT_USERNAME="",
+            TAKT_SUPERADMIN_USERNAME="",
+        )
+    else:
+        previous = values.get("TAKT_SITE_ADDRESS", "")
+        host = domain_name(
+            input("Domain" + (" [" + previous + "]" if previous else "") + ": ") or previous
+        )
+        token = getpass.getpass("Bot token (hidden; Enter keeps the saved token): ") or values.get(
+            "TAKT_BOT_TOKEN", ""
+        )
+        if not re.fullmatch(r"[0-9]+:[A-Za-z0-9_-]{20,}", token):
+            raise SetupError("Invalid bot token format.")
+        previous_owner = values.get("TAKT_SUPERADMIN_USERNAME", "")
+        owner = owner_name(
+            input(
+                "Owner @username" + (" [" + previous_owner + "]" if previous_owner else "") + ": "
+            )
+            or previous_owner
+        )
+        identity = bot_call(token, "getMe")
+        webhook = bot_call(token, "getWebhookInfo")
+        if (
+            not isinstance(identity, dict)
+            or not identity.get("is_bot")
+            or not identity.get("username")
+        ):
+            raise SetupError("This token does not identify a bot with a username.")
+        if not isinstance(webhook, dict) or webhook.get("url"):
+            raise SetupError(
+                "This bot already has a webhook. "
+                "Use a dedicated bot or remove its webhook explicitly before setup."
+            )
+        print("Bot: @" + str(identity["username"]))
+        values.update(
+            TAKT_SITE_ADDRESS=host,
+            TAKT_PUBLIC_URL="https://" + host,
+            TAKT_HTTP_PORT="80",
+            TAKT_HTTPS_PORT="443",
+            TAKT_BOT_TOKEN=token,
+            TAKT_BOT_USERNAME=str(identity["username"]),
+            TAKT_SUPERADMIN_USERNAME=owner,
+        )
+    values.setdefault("TAKT_POSTGRES_PASSWORD", secrets.token_hex(32))
+    values.setdefault("TAKT_TIME_ZONE", "Europe/Moscow")
+    save_env(config, values)
+    print("Configuration saved:", config)
+
+
+def main(argv: list[str] | None = None) -> None:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "action",
+        choices=["setup", "up", "update", "status", "logs", "stop", "backup", "configure-bot"],
+    )
+    parser.add_argument("--config", type=Path, default=ROOT / ".env.host")
+    parser.add_argument("--project", help="Docker project; defaults to the saved installation name")
+    parser.add_argument(
+        "--local",
+        action="store_true",
+        help="HTTP smoke-test installation, without Telegram registration",
+    )
+    parser.add_argument("--port", type=int, default=8080, help="HTTP port for --local")
+    args = parser.parse_args(argv)
+    if not 1 <= args.port < 65535:
+        raise SetupError("Invalid local port.")
+    if shutil.which("docker") is None:
+        raise SetupError(
+            "Install Docker Engine and its Compose plugin: https://docs.docker.com/engine/install/"
+        )
+    subprocess.run(["docker", "compose", "version"], check=True)
+    subprocess.run(["docker", "info", "--format", "{{.ServerVersion}}"], check=True)
+    config = args.config.expanduser().resolve()
+    if args.action in {"status", "logs"}:
+        values = read_env(config)
+        if not values:
+            raise SetupError("Run 'python3 scripts/host.py setup' first.")
+        project = configured_project(args.project, values)
+        profile = (
+            ("--profile", "telegram")
+            if values.get("TAKT_PUBLIC_URL", "").startswith("https://")
+            else ()
+        )
+        command = ("ps", "-a") if args.action == "status" else ("logs", "--tail", "100")
+        compose(config, project, *profile, *command)
+        return
+    config.parent.mkdir(parents=True, exist_ok=True)
+    with installation_lock(config):
+        values = read_env(config)
+        project = configured_project(args.project, values)
+        if args.action == "setup":
+            values.setdefault("TAKT_PROJECT_NAME", project)
+            setup_values(config, values, args)
+        if not values:
+            raise SetupError("Run 'python3 scripts/host.py setup' first.")
+        if args.action == "update":
+            update_checkout()
+        elif args.action in {"setup", "up"}:
+            if "TAKT_PROJECT_NAME" not in values:
+                values["TAKT_PROJECT_NAME"] = project
+                save_env(config, values)
+            deploy(config, project, values, setup=args.action == "setup")
+            if args.action == "setup" and values.get("TAKT_PUBLIC_URL", "").startswith("https://"):
+                print(
+                    "Open the bot as @"
+                    + values["TAKT_SUPERADMIN_USERNAME"]
+                    + " to bind the owner's verified Telegram ID."
+                )
+                print(
+                    "The optional main profile Mini App shortcut is configured in @BotFather. "
+                    "The chat menu button is already configured."
+                )
+        elif args.action == "configure-bot":
+            if not values.get("TAKT_PUBLIC_URL", "").startswith("https://"):
+                raise SetupError("Telegram requires the production HTTPS configuration.")
+            verify_public_url(values["TAKT_PUBLIC_URL"])
+            ensure_bot_username(config, values)
+            configure_bot(values)
+            print("Telegram menu and commands configured.")
+        elif args.action == "stop":
+            profile = (
+                ("--profile", "telegram")
+                if values.get("TAKT_PUBLIC_URL", "").startswith("https://")
+                else ()
+            )
+            compose(config, project, *profile, "stop")
+        elif args.action == "backup":
+            database_backup(config, project)
+    if args.action == "update":
+        # Reload the fetched installer code, preserving this installation's identity.
+        subprocess.run(
+            [
+                sys.executable,
+                str(ROOT / "scripts/host.py"),
+                "up",
+                "--config",
+                str(config),
+                "--project",
+                project,
+            ],
+            cwd=ROOT,
+            check=True,
+        )
 
 
 if __name__ == "__main__":

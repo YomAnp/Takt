@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from typing import Literal
 from uuid import UUID, uuid4
 from zoneinfo import ZoneInfo
 
@@ -206,7 +207,12 @@ async def _apply(
             if active_break is not None:
                 raise CommandConflict("already_on_break")
             record.breaks.append(
-                BreakRecord(id=uuid4(), attendance_id=record.id, started_at=event_at)
+                BreakRecord(
+                    id=uuid4(),
+                    attendance_id=record.id,
+                    started_at=event_at,
+                    kind=str(parameters.get("kind", "regular")),
+                )
             )
         elif operation == "end_break":
             break_id = UUID(str(parameters["break_id"]))
@@ -325,7 +331,17 @@ async def start_break(
     expected_revision: int,
     now: datetime,
     time_zone: ZoneInfo,
+    kind: Literal["regular", "smoke"] = "regular",
 ) -> CommandResult:
+    if kind not in {"regular", "smoke"}:
+        raise ValueError("Unknown break kind.")
+    parameters: dict[str, object] = {
+        "attendance_id": str(attendance_id),
+        "expected_revision": expected_revision,
+    }
+    # Preserve fingerprints of successful commands written before named breaks.
+    if kind != "regular":
+        parameters["kind"] = kind
     return await _execute(
         session,
         actor_id=actor_id,
@@ -333,10 +349,7 @@ async def start_break(
         now=now,
         time_zone=time_zone,
         operation="start_break",
-        parameters={
-            "attendance_id": str(attendance_id),
-            "expected_revision": expected_revision,
-        },
+        parameters=parameters,
     )
 
 

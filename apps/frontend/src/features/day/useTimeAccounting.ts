@@ -9,6 +9,7 @@ import {
   type Summary,
   type TimeCommand,
 } from "../../shared/api/client";
+import { haptic } from "../../shared/lib/telegram";
 import { eventTime, localInput } from "../../shared/lib/time";
 type Operation =
   "check_in" | "check_out" | "start_break" | "end_break" | "reopen";
@@ -83,6 +84,7 @@ export function useTimeAccounting(
         body: JSON.stringify(body),
       }),
     onSuccess: (_result, variables) => {
+      haptic("success");
       setDialog(null);
       setPreview(null);
       setFailed(null);
@@ -100,6 +102,8 @@ export function useTimeAccounting(
       );
       cache.invalidateQueries({ queryKey: ["state"] });
       cache.invalidateQueries({ queryKey: ["history"] });
+      cache.invalidateQueries({ queryKey: ["friends"] });
+      cache.invalidateQueries({ queryKey: ["leaderboard"] });
     },
     onError: (error, variables) => {
       if (error instanceof ApiError && error.code === "stale_revision")
@@ -170,7 +174,7 @@ export function useTimeAccounting(
       cache.invalidateQueries({ queryKey: ["state"] });
     }
   }, [serverNow, zone, data, cache]);
-  const busy = mutation.isPending || state.isFetching || !!failed;
+  const busy = mutation.isPending || state.isPending || !!failed;
 
   function open(kind: Dialog) {
     setDialog(kind);

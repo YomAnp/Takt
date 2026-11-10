@@ -41,6 +41,7 @@ class TimeCommand(BaseModel):
     attendance_id: UUID | None = None
     expected_revision: int | None = Field(default=None, strict=True, ge=1)
     break_id: UUID | None = None
+    break_kind: Literal["regular", "smoke"] = "regular"
     occurred_at: AwareDatetime | None = None
     confirmed: bool = False
 
@@ -160,6 +161,8 @@ async def action(
 ) -> CommandResult:
     clock = datetime.now(UTC)
     zone = ZoneInfo(request.app.state.settings.time_zone)
+    if operation != "start_break" and body.break_kind != "regular":
+        raise HTTPException(422, detail={"code": "unexpected_command_fields"})
     async with session_factory(request.app.state.database)() as session:
         if operation == "check_in":
             if (
@@ -214,6 +217,7 @@ async def action(
                 request_id=body.request_id,
                 attendance_id=body.attendance_id,
                 expected_revision=body.expected_revision,
+                kind=body.break_kind,
                 now=clock,
                 time_zone=zone,
             )

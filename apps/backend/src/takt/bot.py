@@ -2,9 +2,11 @@
 
 import asyncio
 import logging
+import re
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 from aiogram import Bot, Dispatcher, F
-from aiogram.filters import Command
+from aiogram.filters import Command, CommandObject
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup, Message, WebAppInfo
 
 from takt.config import Settings
@@ -14,13 +16,20 @@ def make_dispatcher(public_url: str) -> Dispatcher:
     dispatcher = Dispatcher()
 
     @dispatcher.message(Command("start", "help"), F.chat.type == "private")
-    async def welcome(message: Message) -> None:
+    async def welcome(message: Message, command: CommandObject) -> None:
+        match = re.fullmatch(r"friend_([A-Za-z0-9_-]{32,64})", command.args or "")
+        url = public_url
+        if match:
+            parts = urlsplit(public_url)
+            query = [(key, value) for key, value in parse_qsl(parts.query) if key != "invite"]
+            query.append(("invite", match.group(1)))
+            url = urlunsplit((parts.scheme, parts.netloc, parts.path or "/", urlencode(query), ""))
         await message.answer(
             "Такт — ваш рабочий день под рукой. "
             "Отмечайте приход и уход, смотрите время и статистику.",
             reply_markup=InlineKeyboardMarkup(
                 inline_keyboard=[
-                    [InlineKeyboardButton(text="Открыть Такт", web_app=WebAppInfo(url=public_url))]
+                    [InlineKeyboardButton(text="Открыть Такт", web_app=WebAppInfo(url=url))]
                 ]
             ),
         )
