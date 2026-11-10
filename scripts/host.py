@@ -13,10 +13,11 @@ import sys
 import time
 import urllib.error
 import urllib.request
-from contextlib import contextmanager
+from contextlib import contextmanager, suppress
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
+LOCAL_OVERLAY_PATHS = {"apps/frontend/Caddyfile"}
 
 
 class SetupError(RuntimeError):
@@ -290,6 +291,56 @@ def git_output(*args: str) -> str:
     return subprocess.check_output(["git", *args], cwd=ROOT, text=True).strip()
 
 
+def local_overlay_stash() -> str | None:
+    """Temporarily keep the supported host-local Caddy overlay across a fast-forward."""
+    status = subprocess.check_output(
+        ["git", "status", "--porcelain=v1", "--untracked-files=no"], cwd=ROOT, text=True
+    ).rstrip()
+    if not status:
+        return None
+    entries = status.splitlines()
+    paths = {entry[3:] for entry in entries if len(entry) >= 4}
+    if paths != LOCAL_OVERLAY_PATHS or any(entry[:2] != " M" for entry in entries):
+        raise SetupError(
+            "Source files contain local changes. Only the host-local apps/frontend/Caddyfile "
+            "overlay is preserved automatically. Commit or save other changes before updating."
+        )
+    subprocess.run(
+        [
+            "git",
+            "stash",
+            "push",
+            "--message",
+            "takt-host-preserved-local-overlay",
+            "--",
+            "apps/frontend/Caddyfile",
+        ],
+        cwd=ROOT,
+        check=True,
+    )
+    return git_output("rev-parse", "refs/stash")
+
+
+def restore_local_overlay(stash: str | None) -> None:
+    if stash is None:
+        return
+    try:
+        subprocess.run(["git", "stash", "apply", stash], cwd=ROOT, check=True)
+    except subprocess.CalledProcessError:
+        raise SetupError(
+            "The host-local apps/frontend/Caddyfile overlay conflicts with the new version. "
+            "The update is stopped; resolve the Caddyfile conflict and run "
+            "'python3 scripts/host.py up'."
+        ) from None
+    references = git_output("stash", "list", "--format=%gd %H").splitlines()
+    reference = next(
+        (line.split(" ", 1)[0] for line in references if line.endswith(" " + stash)), None
+    )
+    if reference is None:
+        raise SetupError("The preserved host-local overlay stash could not be found.")
+    subprocess.run(["git", "stash", "drop", reference], cwd=ROOT, check=True)
+
+
 def update_checkout() -> None:
     """Fast-forward only; local source edits and commits are never discarded."""
     if shutil.which("git") is None:
@@ -501,7 +552,15 @@ def main(argv: list[str] | None = None) -> None:
         if not values:
             raise SetupError("Run 'python3 scripts/host.py setup' first.")
         if args.action == "update":
-            update_checkout()
+            overlay_stash = local_overlay_stash()
+            try:
+                update_checkout()
+                restore_local_overlay(overlay_stash)
+            except Exception:
+                if overlay_stash is not None:
+                    with suppress(SetupError):
+                        restore_local_overlay(overlay_stash)
+                raise
         elif args.action in {"setup", "up"}:
             if "TAKT_PROJECT_NAME" not in values:
                 values["TAKT_PROJECT_NAME"] = project

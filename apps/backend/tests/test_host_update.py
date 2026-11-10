@@ -158,6 +158,7 @@ def test_update_runs_the_fetched_installer_with_the_saved_configuration(tmp_path
 
     monkeypatch.setattr(host.subprocess, "run", run)
     monkeypatch.setattr(host, "update_checkout", lambda: calls.append(["fetched-source"]))
+    monkeypatch.setattr(host, "local_overlay_stash", lambda: None)
     host.main(["update", "--config", str(config)])
     assert calls[-2] == ["fetched-source"]
     assert calls[-1] == [
@@ -263,6 +264,33 @@ def test_update_fast_forwards_existing_checkout_and_preserves_config(checkout):
     assert (installed / "version.txt").read_text(encoding="utf-8") == "new"
     assert (installed / ".env.host").read_text(encoding="utf-8") == "TAKT_POSTGRES_PASSWORD=saved\n"
     assert git(installed, "rev-parse", "HEAD") == git(origin, "rev-parse", "HEAD")
+
+
+def test_update_keeps_the_supported_local_caddy_overlay(checkout):
+    origin, installed = checkout
+    caddy = origin / "apps" / "frontend" / "Caddyfile"
+    caddy.parent.mkdir(parents=True)
+    caddy.write_text("takt.example.org {\n    file_server\n}\n", encoding="utf-8")
+    commit(origin, "add caddyfile")
+    host.update_checkout()
+
+    local = installed / "apps" / "frontend" / "Caddyfile"
+    local.write_text(
+        local.read_text(encoding="utf-8") + "\nduel.squad-fun.su {\n}\n",
+        encoding="utf-8",
+    )
+    (origin / "version.txt").write_text("release", encoding="utf-8")
+    commit(origin, "release")
+
+    stash = host.local_overlay_stash()
+    host.update_checkout()
+    host.restore_local_overlay(stash)
+
+    assert (installed / "version.txt").read_text(encoding="utf-8") == "release"
+    assert "duel.squad-fun.su" in local.read_text(encoding="utf-8")
+    assert "apps/frontend/Caddyfile" in git(
+        installed, "status", "--porcelain", "--untracked-files=no"
+    )
 
 
 def test_update_preserves_uncommitted_source_edits(checkout):
