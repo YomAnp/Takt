@@ -23,6 +23,8 @@ npm --prefix apps/frontend run build
 
 The build checks TypeScript and creates files in `apps/frontend/dist/`. The timer updates locally; state refreshes after actions, returning to the application, and a date change.
 
+The main screen keeps the credited time and the primary action visible. The dark theme is the default; users can choose the light theme in settings, which is saved on the device.
+
 ## Directories
 
 | Path within `apps/frontend/src/` | Contents |
@@ -31,6 +33,7 @@ The build checks TypeScript and creates files in `apps/frontend/dist/`. The time
 | `features/day/` | Working day, entries, and departure confirmation |
 | `features/profile/` | First launch and preferences |
 | `features/statistics/` | Personal statistics |
+| `features/people/` | Friends, invitations, statuses, and rankings |
 | `features/admin/` | Users, access, and individual accounting |
 | `shared/api/` | Requests and API types |
 | `shared/api/generated/` | Types from the server's OpenAPI |

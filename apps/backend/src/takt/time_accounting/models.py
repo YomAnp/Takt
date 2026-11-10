@@ -31,6 +31,8 @@ class User(Base):
     telegram_id: Mapped[int | None] = mapped_column(BigInteger, unique=True)
     display_name: Mapped[str] = mapped_column(String(80), server_default="")
     telegram_username: Mapped[str | None] = mapped_column(String(64))
+    photo_url: Mapped[str | None] = mapped_column(String(2048))
+    leaderboard_enabled: Mapped[bool] = mapped_column(Boolean, server_default=text("false"))
     onboarded_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     role: Mapped[str] = mapped_column(String(16), server_default="member")
     is_active: Mapped[bool] = mapped_column(Boolean, server_default=text("true"))
@@ -65,7 +67,7 @@ class AttendanceRecord(Base):
 
     id: Mapped[uuid.UUID] = mapped_column(UUID, primary_key=True, default=uuid.uuid4)
     user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"))
-    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
     ended_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     revision: Mapped[int] = mapped_column(Integer, server_default="1")
     breaks: Mapped[list["BreakRecord"]] = relationship(
@@ -77,6 +79,7 @@ class BreakRecord(Base):
     __tablename__ = "breaks"
     __table_args__ = (
         CheckConstraint("ended_at IS NULL OR ended_at > started_at", name="positive_break"),
+        CheckConstraint("kind IN ('regular', 'smoke')", name="valid_break_kind"),
         ExcludeConstraint(
             ("attendance_id", "="),
             (func.tstzrange(text("started_at"), text("ended_at"), text("'[)'")), "&&"),
@@ -89,6 +92,7 @@ class BreakRecord(Base):
     attendance_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("attendance.id"), index=True)
     started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     ended_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    kind: Mapped[str] = mapped_column(String(16), server_default="regular")
     attendance: Mapped[AttendanceRecord] = relationship(back_populates="breaks")
 
 

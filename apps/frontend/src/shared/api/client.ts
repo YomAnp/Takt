@@ -8,7 +8,6 @@ import type {
   StateOutput,
   TimeCommand,
 } from "./generated/types.gen";
-
 export type {
   AccessChange,
   CheckoutPreview,
@@ -71,6 +70,22 @@ export const login = async (initData: string) => {
   return result.profile;
 };
 const messages: Record<string, string> = {
+  invite_expired:
+    "Ссылка устарела. Попросите друга прислать новое приглашение.",
+  invite_self: "Это ваша ссылка. Перешлите её другу.",
+  friend_request_limit:
+    "У вас много ожидающих заявок. Отмените ненужные и повторите.",
+  friend_requests_full: "У друга много ожидающих заявок. Попробуйте позже.",
+  friend_request_cooldown: "Заявка недавно была отклонена. Попробуйте позже.",
+  friend_request_not_pending: "Заявка уже обработана. Список обновлён.",
+  friend_request_not_found: "Заявка больше недоступна. Обновите список.",
+  friend_not_found:
+    "Друг больше недоступен. Закройте профиль и обновите список.",
+  friendship_changed:
+    "Дружба изменилась. Откройте профиль заново перед удалением.",
+  social_not_configured:
+    "Приглашения пока недоступны. Обратитесь к администратору.",
+
   connection_failed: "Нет связи с сервером. Проверьте подключение и повторите.",
   invalid_telegram_data: "Откройте приложение заново из меню бота.",
   login_required:

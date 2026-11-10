@@ -92,6 +92,10 @@ export type BreakSnapshot = {
      * Ended At
      */
     ended_at: string | null;
+    /**
+     * Kind
+     */
+    kind?: 'regular' | 'smoke';
 };
 
 /**
@@ -201,6 +205,137 @@ export type CommandResult = {
 };
 
 /**
+ * FriendProfile
+ */
+export type FriendProfile = {
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Display Name
+     */
+    display_name: string;
+    /**
+     * Photo Url
+     */
+    photo_url?: string | null;
+    /**
+     * Friendship Id
+     */
+    friendship_id?: string | null;
+    /**
+     * Status
+     */
+    status: 'working' | 'on_break' | 'smoking' | 'away' | 'needs_checkout';
+    /**
+     * Status Since
+     */
+    status_since: string | null;
+    /**
+     * Confirmed Seconds
+     */
+    confirmed_seconds: number;
+    /**
+     * Period Start
+     */
+    period_start: string | null;
+    /**
+     * Period End
+     */
+    period_end: string;
+};
+
+/**
+ * FriendRequestInput
+ */
+export type FriendRequestInput = {
+    /**
+     * Invite Token
+     */
+    invite_token: string;
+};
+
+/**
+ * FriendRequestOutput
+ */
+export type FriendRequestOutput = {
+    /**
+     * Id
+     */
+    id: string;
+    user: Peer;
+    /**
+     * Created At
+     */
+    created_at: string;
+    /**
+     * Direction
+     */
+    direction: 'incoming' | 'outgoing';
+};
+
+/**
+ * FriendSummary
+ */
+export type FriendSummary = {
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Display Name
+     */
+    display_name: string;
+    /**
+     * Photo Url
+     */
+    photo_url?: string | null;
+    /**
+     * Friendship Id
+     */
+    friendship_id?: string | null;
+    /**
+     * Status
+     */
+    status: 'working' | 'on_break' | 'smoking' | 'away' | 'needs_checkout';
+    /**
+     * Status Since
+     */
+    status_since: string | null;
+    /**
+     * Confirmed Seconds
+     */
+    confirmed_seconds: number;
+};
+
+/**
+ * FriendsPage
+ */
+export type FriendsPage = {
+    /**
+     * Items
+     */
+    items: Array<FriendSummary>;
+    /**
+     * Total
+     */
+    total: number;
+    /**
+     * Incoming
+     */
+    incoming: Array<FriendRequestOutput>;
+    /**
+     * Outgoing
+     */
+    outgoing: Array<FriendRequestOutput>;
+    /**
+     * As Of
+     */
+    as_of: string;
+};
+
+/**
  * HTTPValidationError
  */
 export type HttpValidationError = {
@@ -208,6 +343,105 @@ export type HttpValidationError = {
      * Detail
      */
     detail?: Array<ValidationError>;
+};
+
+/**
+ * InviteOutput
+ */
+export type InviteOutput = {
+    /**
+     * Token
+     */
+    token: string;
+    /**
+     * Url
+     */
+    url: string;
+    /**
+     * Expires At
+     */
+    expires_at: string;
+};
+
+/**
+ * InvitePreview
+ */
+export type InvitePreview = {
+    user: Peer;
+    /**
+     * Expires At
+     */
+    expires_at: string;
+    /**
+     * Is Self
+     */
+    is_self: boolean;
+    /**
+     * Already Friends
+     */
+    already_friends: boolean;
+    /**
+     * Pending Request Id
+     */
+    pending_request_id: string | null;
+};
+
+/**
+ * LeaderboardEntry
+ */
+export type LeaderboardEntry = {
+    /**
+     * Rank
+     */
+    rank: number;
+    user: Peer;
+    /**
+     * Seconds
+     */
+    seconds: number;
+    /**
+     * Is Self
+     */
+    is_self: boolean;
+};
+
+/**
+ * LeaderboardPage
+ */
+export type LeaderboardPage = {
+    /**
+     * Items
+     */
+    items: Array<LeaderboardEntry>;
+    /**
+     * Total
+     */
+    total: number;
+    current_user: LeaderboardEntry | null;
+    /**
+     * Scope
+     */
+    scope: 'global' | 'friends';
+    /**
+     * Period
+     */
+    period: 'week' | 'month' | 'all';
+    /**
+     * Period Start
+     */
+    period_start: string | null;
+    /**
+     * Period End
+     */
+    period_end: string;
+    /**
+     * Participating
+     */
+    participating: boolean;
+    /**
+     * As Of
+     */
+    as_of: string;
 };
 
 /**
@@ -229,6 +463,24 @@ export type LoginOutput = {
      */
     token: string;
     profile: Profile;
+};
+
+/**
+ * Peer
+ */
+export type Peer = {
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Display Name
+     */
+    display_name: string;
+    /**
+     * Photo Url
+     */
+    photo_url?: string | null;
 };
 
 /**
@@ -262,6 +514,10 @@ export type Preferences = {
      * End Time
      */
     end_time: string;
+    /**
+     * Leaderboard Enabled
+     */
+    leaderboard_enabled?: boolean | null;
 };
 
 /**
@@ -299,6 +555,14 @@ export type Profile = {
      */
     telegram_username: string | null;
     /**
+     * Photo Url
+     */
+    photo_url?: string | null;
+    /**
+     * Leaderboard Enabled
+     */
+    leaderboard_enabled?: boolean;
+    /**
      * Role
      */
     role: 'member' | 'admin' | 'superadmin';
@@ -314,6 +578,17 @@ export type Profile = {
      * End Time
      */
     end_time?: string | null;
+};
+
+/**
+ * RequestResult
+ */
+export type RequestResult = {
+    request: FriendRequestOutput | null;
+    /**
+     * Status
+     */
+    status: 'incoming' | 'outgoing' | 'accepted';
 };
 
 /**
@@ -429,6 +704,10 @@ export type TimeCommand = {
      * Break Id
      */
     break_id?: string | null;
+    /**
+     * Break Kind
+     */
+    break_kind?: 'regular' | 'smoke';
     /**
      * Occurred At
      */
@@ -790,6 +1069,249 @@ export type GetEmployeeDayResponses = {
 };
 
 export type GetEmployeeDayResponse = GetEmployeeDayResponses[keyof GetEmployeeDayResponses];
+
+export type GetFriendsPageData = {
+    body?: never;
+    path?: never;
+    query?: {
+        /**
+         * Offset
+         */
+        offset?: number;
+    };
+    url: '/api/v1/social/friends';
+};
+
+export type GetFriendsPageErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type GetFriendsPageError = GetFriendsPageErrors[keyof GetFriendsPageErrors];
+
+export type GetFriendsPageResponses = {
+    /**
+     * Successful Response
+     */
+    200: FriendsPage;
+};
+
+export type GetFriendsPageResponse = GetFriendsPageResponses[keyof GetFriendsPageResponses];
+
+export type CreateFriendInviteData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/social/invite';
+};
+
+export type CreateFriendInviteResponses = {
+    /**
+     * Successful Response
+     */
+    200: InviteOutput;
+};
+
+export type CreateFriendInviteResponse = CreateFriendInviteResponses[keyof CreateFriendInviteResponses];
+
+export type PreviewFriendInviteData = {
+    body?: never;
+    path: {
+        /**
+         * Token
+         */
+        token: string;
+    };
+    query?: never;
+    url: '/api/v1/social/invites/{token}';
+};
+
+export type PreviewFriendInviteErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type PreviewFriendInviteError = PreviewFriendInviteErrors[keyof PreviewFriendInviteErrors];
+
+export type PreviewFriendInviteResponses = {
+    /**
+     * Successful Response
+     */
+    200: InvitePreview;
+};
+
+export type PreviewFriendInviteResponse = PreviewFriendInviteResponses[keyof PreviewFriendInviteResponses];
+
+export type SendFriendRequestData = {
+    body: FriendRequestInput;
+    path?: never;
+    query?: never;
+    url: '/api/v1/social/requests';
+};
+
+export type SendFriendRequestErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type SendFriendRequestError = SendFriendRequestErrors[keyof SendFriendRequestErrors];
+
+export type SendFriendRequestResponses = {
+    /**
+     * Successful Response
+     */
+    200: RequestResult;
+};
+
+export type SendFriendRequestResponse = SendFriendRequestResponses[keyof SendFriendRequestResponses];
+
+export type RespondToFriendRequestData = {
+    body?: never;
+    path: {
+        /**
+         * Request Id
+         */
+        request_id: string;
+        /**
+         * Action
+         */
+        action: 'accept' | 'decline' | 'cancel';
+    };
+    query?: never;
+    url: '/api/v1/social/requests/{request_id}/{action}';
+};
+
+export type RespondToFriendRequestErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type RespondToFriendRequestError = RespondToFriendRequestErrors[keyof RespondToFriendRequestErrors];
+
+export type RespondToFriendRequestResponses = {
+    /**
+     * Successful Response
+     */
+    204: void;
+};
+
+export type RespondToFriendRequestResponse = RespondToFriendRequestResponses[keyof RespondToFriendRequestResponses];
+
+export type RemoveFriendData = {
+    body?: never;
+    path: {
+        /**
+         * Friend Id
+         */
+        friend_id: string;
+    };
+    query?: {
+        /**
+         * Friendship Id
+         */
+        friendship_id?: string | null;
+    };
+    url: '/api/v1/social/friends/{friend_id}';
+};
+
+export type RemoveFriendErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type RemoveFriendError = RemoveFriendErrors[keyof RemoveFriendErrors];
+
+export type RemoveFriendResponses = {
+    /**
+     * Successful Response
+     */
+    204: void;
+};
+
+export type RemoveFriendResponse = RemoveFriendResponses[keyof RemoveFriendResponses];
+
+export type GetFriendProfileData = {
+    body?: never;
+    path: {
+        /**
+         * Friend Id
+         */
+        friend_id: string;
+    };
+    query?: {
+        /**
+         * Period
+         */
+        period?: 'week' | 'month' | 'all';
+    };
+    url: '/api/v1/social/friends/{friend_id}';
+};
+
+export type GetFriendProfileErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type GetFriendProfileError = GetFriendProfileErrors[keyof GetFriendProfileErrors];
+
+export type GetFriendProfileResponses = {
+    /**
+     * Successful Response
+     */
+    200: FriendProfile;
+};
+
+export type GetFriendProfileResponse = GetFriendProfileResponses[keyof GetFriendProfileResponses];
+
+export type GetLeaderboardData = {
+    body?: never;
+    path?: never;
+    query?: {
+        /**
+         * Scope
+         */
+        scope?: 'global' | 'friends';
+        /**
+         * Period
+         */
+        period?: 'week' | 'month' | 'all';
+        /**
+         * Offset
+         */
+        offset?: number;
+    };
+    url: '/api/v1/social/leaderboard';
+};
+
+export type GetLeaderboardErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type GetLeaderboardError = GetLeaderboardErrors[keyof GetLeaderboardErrors];
+
+export type GetLeaderboardResponses = {
+    /**
+     * Successful Response
+     */
+    200: LeaderboardPage;
+};
+
+export type GetLeaderboardResponse = GetLeaderboardResponses[keyof GetLeaderboardResponses];
 
 export type GetHealthData = {
     body?: never;

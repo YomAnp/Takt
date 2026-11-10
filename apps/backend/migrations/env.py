@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import create_async_engine
 from takt.config import Settings
 from takt.database import Base
 from takt.runtime import new_event_loop
+from takt.social import models as social_models  # noqa: F401
 from takt.time_accounting import models  # noqa: F401
 
 config = context.config

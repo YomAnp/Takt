@@ -7,6 +7,11 @@ import {
   type Preferences,
   type Profile,
 } from "../../shared/api/client";
+import {
+  setThemePreference,
+  themePreference,
+  type ThemePreference,
+} from "../../shared/lib/telegram";
 import { Notice } from "../../shared/ui/Notice";
 export function PreferencesForm({
   profile,
@@ -19,6 +24,8 @@ export function PreferencesForm({
 }) {
   const [name, setName] = useState(profile.display_name);
   const [end, setEnd] = useState(profile.end_time?.slice(0, 5) || "18:00");
+  const [ranking, setRanking] = useState(profile.leaderboard_enabled ?? false);
+  const [theme, setTheme] = useState<ThemePreference>(themePreference());
   const mutation = useMutation({
     mutationFn: (body: Preferences) =>
       api<Profile>("/me/preferences", {
@@ -32,7 +39,12 @@ export function PreferencesForm({
       className="preferences"
       onSubmit={(event) => {
         event.preventDefault();
-        mutation.mutate({ display_name: name.trim(), end_time: end });
+        setThemePreference(theme);
+        mutation.mutate({
+          display_name: name.trim(),
+          end_time: end,
+          ...(!welcome ? { leaderboard_enabled: ranking } : {}),
+        });
       }}
     >
       <label>
@@ -50,6 +62,7 @@ export function PreferencesForm({
         Окончание рабочего дня
         <input
           name="end_time"
+          autoComplete="off"
           type="time"
           value={end}
           onChange={(event) => setEnd(event.target.value)}
@@ -60,6 +73,37 @@ export function PreferencesForm({
         Достаточно указать один раз. Приход вы отмечаете сами, а перерывы — по
         желанию.
       </p>
+      {!welcome && (
+        <>
+          <label>
+            Тема приложения
+            <select
+              name="theme"
+              value={theme}
+              onChange={(event) =>
+                setTheme(event.target.value as ThemePreference)
+              }
+            >
+              <option value="dark">Тёмная</option>
+              <option value="light">Светлая</option>
+            </select>
+          </label>
+          <label className="setting-toggle">
+            <span>
+              <strong>Общий рейтинг</strong>
+              <small>
+                Можно включить участие в общем рейтинге подтверждённых часов.
+              </small>
+            </span>
+            <input
+              type="checkbox"
+              name="leaderboard_enabled"
+              checked={ranking}
+              onChange={(event) => setRanking(event.target.checked)}
+            />
+          </label>
+        </>
+      )}
       {mutation.error && <Notice>{errorText(mutation.error)}</Notice>}
       <button
         className="primary"
@@ -74,7 +118,7 @@ export function PreferencesForm({
       </button>
       {mutation.isSuccess && !welcome && (
         <p className="saved" role="status">
-          <Check size={16} />
+          <Check size={16} aria-hidden="true" />
           Настройки сохранены
         </p>
       )}

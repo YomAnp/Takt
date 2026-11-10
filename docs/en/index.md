@@ -31,6 +31,8 @@ The [project overview](project.md) explains the selected stack and component bou
 
 ## Documentation
 
+[Friends, smoking breaks, and rankings](product/people.md): invitations, statuses, and confirmed hours.
+
 The Russian and English versions contain the same information. The language link opens the corresponding page; changes update both versions in the same pull request.
 
 Wiki sources live in `docs/`; no separate GitHub Wiki or documentation site has been published.
