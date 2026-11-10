@@ -53,7 +53,9 @@ After the first update, one command can fetch a new version from `origin/main` a
 python3 scripts/host.py update
 ```
 
-The command requires a clean `main` branch and permits only a fast-forward. Local source edits and custom commits are retained; when present, update the sources manually. For an archive-based installation, obtain the new sources and use `up`.
+The command requires the `main` branch and permits only a fast-forward. Local source edits and custom commits are retained; when present, update the sources manually. For an archive-based installation, obtain the new sources and use `up`.
+
+The host-local `apps/frontend/Caddyfile` overlay is supported: the updater temporarily stashes it, fast-forwards the checkout, and restores it before building containers. If the new version touches the same section, the update stops so the conflict can be resolved.
 
 The Docker project name is stored in `TAKT_PROJECT_NAME`. If an older installation used `--project`, pass the same name on its first update; subsequent commands use the saved value. Concurrent installation commands for one configuration are blocked.
 

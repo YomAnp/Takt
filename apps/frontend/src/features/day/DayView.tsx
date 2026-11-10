@@ -125,12 +125,12 @@ export function DayView({
                     ? "время сохранено"
                     : "до начала дня"}
               </span>
-              <div className="time-meta">
-                <span>Сегодня</span>
-                <span>
-                  До <strong>{profile.end_time?.slice(0, 5)}</strong>
-                </span>
-              </div>
+            </div>
+            <div className="time-meta">
+              <span>Сегодня</span>
+              <span>
+                До <strong>{profile.end_time?.slice(0, 5)}</strong>
+              </span>
             </div>
           </div>
           <button
