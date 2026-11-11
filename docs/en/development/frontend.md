@@ -25,6 +25,16 @@ The build checks TypeScript and creates files in `apps/frontend/dist/`. The time
 
 The main screen keeps the credited time and the primary action visible. The dark theme is the default; users can choose the light theme in settings, which is saved on the device.
 
+## Logo
+
+Brand assets live in `apps/frontend/public/brand/`. The source is `logo.svg`; the bot avatar and home screen icon are exported from it. After editing the SVG, run from the repository root:
+
+```sh
+node scripts/brand.mjs
+```
+
+The export uses installed Google Chrome and frontend dependencies. Exported images are stored in the repository and included in the regular build.
+
 ## Directories
 
 | Path within `apps/frontend/src/` | Contents |

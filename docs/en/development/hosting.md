@@ -14,7 +14,7 @@ From the clone's root:
 python3 scripts/host.py setup
 ```
 
-The installer asks for the domain, hidden token, and the owner's `@username`. It verifies the bot, saves parameters in `.env.host`, generates a random PostgreSQL password, builds the client and server, applies migrations, and starts containers. After checking application availability, it configures the bot description, commands, and Mini App button.
+The installer asks for the domain, hidden token, and the owner's `@username`. It verifies the bot, saves parameters in `.env.host`, generates a random PostgreSQL password, builds the client and server, applies migrations, and starts containers. After checking application availability, it configures the bot name, avatar, description, commands, and Mini App button.
 
 Settings and the token are not passed into the client build. The `.env.host` file is excluded from Git and accessible only to its owner on Linux. Reconfiguration retains the existing database password.
 
@@ -32,7 +32,9 @@ Management is available under “Users” in application settings. Users cannot 
 
 ## Telegram
 
-The installer uses supported Bot API methods: `setMyCommands`, `setMyDescription`, `setMyShortDescription`, and `setChatMenuButton`. The chat button opens the application's HTTPS address. The separate main Mini App shortcut on the profile is configured through BotFather; see [Mini App settings](https://core.telegram.org/bots/webapps).
+The installer sets the name “Такт”, full and short descriptions, avatar, commands, and launch button. Setup and updates apply this profile. The chat button opens the application's HTTPS address. The separate main Mini App shortcut on the profile is configured through BotFather; see [Mini App settings](https://core.telegram.org/bots/webapps).
+
+The logo source is `apps/frontend/public/brand/logo.svg`; the avatar is `apps/frontend/public/brand/avatar.jpg`. Repeated runs retain the current avatar when the file is unchanged. If it was replaced or removed in Telegram, the installer restores the project image.
 
 The bot responds to `/start` and `/help` in private chats. It uses one long-polling process. The installer does not delete an existing webhook: Takt needs a dedicated bot or an explicitly released connection.
 
@@ -76,4 +78,8 @@ The `--config` and `--project` parameters select a separate settings file and na
 python3 scripts/host.py setup --local --config .env.host.local --project takt-local --port 8080
 ```
 
-This mode checks building, startup, and availability; Telegram connectivity uses the main HTTPS mode. The `configure-bot` command registers the bot menu again.
+This mode checks building, startup, and availability; Telegram connectivity uses the main HTTPS mode. To apply the bot profile without rebuilding containers:
+
+```sh
+python3 scripts/host.py configure-bot
+```

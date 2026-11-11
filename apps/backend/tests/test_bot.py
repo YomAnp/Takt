@@ -51,10 +51,18 @@ async def test_bot_commands_open_configured_application_in_private_chat(command)
     reply = session.sent[0]
     assert isinstance(reply, SendMessage)
     assert reply.reply_markup.inline_keyboard[0][0].web_app.url == "https://independent.example.org"
+    if command == "/help":
+        assert "Перерывы и перекуры" in reply.text
+        assert "входят в общее время" in reply.text
+        assert "по вашему желанию" in reply.text
+    else:
+        assert "фактическое время" in reply.text
+        assert "Как пользоваться" not in reply.text
 
 
 @pytest.mark.asyncio
-async def test_bot_does_not_send_private_app_keyboard_to_groups():
+@pytest.mark.parametrize("command", ["/start", "/help"])
+async def test_bot_does_not_send_private_app_keyboard_to_groups(command):
     session = RecordingSession()
     bot = Bot("123456:local_test_token", session=session)
     dispatcher = make_dispatcher("https://independent.example.org")
@@ -66,8 +74,8 @@ async def test_bot_does_not_send_private_app_keyboard_to_groups():
                 "date": int(datetime.now(UTC).timestamp()),
                 "from": {"id": 42, "first_name": "Test", "is_bot": False},
                 "chat": {"id": -42, "type": "group", "title": "Group"},
-                "text": "/start",
-                "entities": [{"type": "bot_command", "offset": 0, "length": 6}],
+                "text": command,
+                "entities": [{"type": "bot_command", "offset": 0, "length": len(command)}],
             },
         }
     )
@@ -99,3 +107,4 @@ async def test_bot_carries_only_valid_friend_invites_into_the_mini_app(argument)
     assert query["source"] == ["bot"]
     assert query.get("invite") == (["A" * 32] if argument.endswith("A" * 32) else None)
     assert "role" not in query
+    assert ("пригласили в друзья" in session.sent[0].text) == argument.endswith("A" * 32)

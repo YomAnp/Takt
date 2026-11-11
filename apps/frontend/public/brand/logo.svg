@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="96" height="96" viewBox="0 0 96 96" fill="none">
+  <title>Такт</title>
+  <path fill="#f5f4eb" d="M0 0h96v96H0z"/>
+  <path d="M25 27h29M41 27v31a12 12 0 0 0 12 12h8" stroke="#173d30" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="73" cy="27" r="6" fill="#70aa86"/>
+</svg>

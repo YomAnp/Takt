@@ -15,7 +15,7 @@ from takt.config import Settings
 def make_dispatcher(public_url: str) -> Dispatcher:
     dispatcher = Dispatcher()
 
-    @dispatcher.message(Command("start", "help"), F.chat.type == "private")
+    @dispatcher.message(Command("start"), F.chat.type == "private")
     async def welcome(message: Message, command: CommandObject) -> None:
         match = re.fullmatch(r"friend_([A-Za-z0-9_-]{32,64})", command.args or "")
         url = public_url
@@ -24,12 +24,43 @@ def make_dispatcher(public_url: str) -> Dispatcher:
             query = [(key, value) for key, value in parse_qsl(parts.query) if key != "invite"]
             query.append(("invite", match.group(1)))
             url = urlunsplit((parts.scheme, parts.netloc, parts.path or "/", urlencode(query), ""))
+        text = (
+            "Такт считает время вашего рабочего дня.\n\n"
+            "Откройте приложение, отметьте приход — и занимайтесь своими делами. "
+            "Когда будете уходить, завершите день. Часы сохранятся в статистике.\n\n"
+            "Если забыли отметиться вовремя, можно указать фактическое время."
+        )
+        if match:
+            text = (
+                "Вас пригласили в друзья в Такте.\n\n"
+                "Откройте приложение, чтобы посмотреть приглашение. "
+                "Вы сами решаете, добавлять ли человека в друзья."
+            )
         await message.answer(
-            "Такт — ваш рабочий день под рукой. "
-            "Отмечайте приход и уход, смотрите время и статистику.",
+            text,
             reply_markup=InlineKeyboardMarkup(
                 inline_keyboard=[
                     [InlineKeyboardButton(text="Открыть Такт", web_app=WebAppInfo(url=url))]
+                ]
+            ),
+        )
+
+    @dispatcher.message(Command("help"), F.chat.type == "private")
+    async def help_message(message: Message) -> None:
+        await message.answer(
+            "Как пользоваться Тактом\n\n"
+            "В «Моём дне» нажмите «Отметиться», когда пришли, и завершите день, когда уходите. "
+            "Если забыли нажать кнопку, укажите фактическое время. "
+            "Случайно завершённый день можно возобновить.\n\n"
+            "Перерывы и перекуры отмечаются по желанию. Они входят в общее время "
+            "и отдельно видны в статистике.\n\n"
+            "В «Статистике» — ваши часы и время после окончания дня. "
+            "В «Людях» — друзья и рейтинги. Общий рейтинг включается в настройках "
+            "только по вашему желанию.\n\n"
+            "Время окончания рабочего дня и тему приложения можно поменять в «Настройках».",
+            reply_markup=InlineKeyboardMarkup(
+                inline_keyboard=[
+                    [InlineKeyboardButton(text="Открыть Такт", web_app=WebAppInfo(url=public_url))]
                 ]
             ),
         )
