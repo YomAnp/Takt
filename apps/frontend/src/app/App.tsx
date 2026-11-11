@@ -14,7 +14,7 @@ import { DayView } from "../features/day/DayView";
 import { TimeDialog } from "../features/day/TimeDialog";
 import { useTimeAccounting } from "../features/day/useTimeAccounting";
 import { IncomingInvite } from "../features/people/InviteSheet";
-import { Flower } from "../shared/ui/Flower";
+import { BrandMark } from "../shared/ui/BrandMark";
 import {
   applyTelegramTheme,
   clearIncomingInvite,
@@ -121,7 +121,7 @@ export function App() {
           >
             {outside || bootError ? (
               <section className="welcome">
-                <Flower />
+                <BrandMark />
                 <h1>{outside ? "Такт в Telegram" : "Не удалось войти"}</h1>
                 <p className="muted">
                   {outside
@@ -143,11 +143,12 @@ export function App() {
               </section>
             ) : !profile ? (
               <section className="loading" role="status">
-                <Flower />
+                <BrandMark />
                 <p>Открываем ваш день…</p>
               </section>
             ) : !profile.onboarded ? (
               <section className="welcome">
+                <BrandMark />
                 <h1>
                   Привет.
                   <br />

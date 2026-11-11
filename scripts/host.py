@@ -2,6 +2,7 @@
 
 import argparse
 import getpass
+import hashlib
 import ipaddress
 import json
 import os
@@ -85,11 +86,40 @@ def save_env(path: Path, values: dict[str, str]) -> None:
         temporary.unlink(missing_ok=True)
 
 
-def bot_call(token: str, method: str, body: dict[str, object] | None = None) -> object:
+def bot_call(
+    token: str,
+    method: str,
+    body: dict[str, object] | None = None,
+    *,
+    photo: bytes | None = None,
+) -> object:
+    content_type = "application/json"
+    data = json.dumps(body or {}).encode()
+    if photo is not None:
+        boundary = "takt-" + secrets.token_hex(16)
+        fields = []
+        for name, value in (body or {}).items():
+            fields.append(
+                (
+                    f'--{boundary}\r\nContent-Disposition: form-data; name="{name}"\r\n\r\n'
+                    + (value if isinstance(value, str) else json.dumps(value))
+                    + "\r\n"
+                ).encode()
+            )
+        fields.append(
+            (
+                f'--{boundary}\r\nContent-Disposition: form-data; name="avatar"; '
+                'filename="avatar.jpg"\r\nContent-Type: image/jpeg\r\n\r\n'
+            ).encode()
+            + photo
+            + f"\r\n--{boundary}--\r\n".encode()
+        )
+        data = b"".join(fields)
+        content_type = "multipart/form-data; boundary=" + boundary
     request = urllib.request.Request(
         "https://api.telegram.org/bot" + token + "/" + method,
-        data=json.dumps(body or {}).encode(),
-        headers={"Content-Type": "application/json"},
+        data=data,
+        headers={"Content-Type": content_type},
     )
     try:
         with urllib.request.urlopen(request, timeout=20) as response:
@@ -106,38 +136,110 @@ def bot_call(token: str, method: str, body: dict[str, object] | None = None) -> 
         ) from None
 
 
-def configure_bot(values: dict[str, str]) -> None:
+def current_bot_photo(token: str, bot_id: int) -> str:
+    result = bot_call(token, "getUserProfilePhotos", {"user_id": bot_id, "limit": 1})
+    if not isinstance(result, dict) or not isinstance(result.get("photos"), list):
+        raise SetupError("Telegram returned an invalid bot profile photo response.")
+    photos = result["photos"]
+    if not photos:
+        return ""
+    if not isinstance(photos[0], list) or not photos[0]:
+        raise SetupError("Telegram returned an invalid bot profile photo response.")
+    largest = photos[0][-1]
+    if not isinstance(largest, dict) or not isinstance(largest.get("file_unique_id"), str):
+        raise SetupError("Telegram returned an invalid bot profile photo response.")
+    return largest["file_unique_id"]
+
+
+def configure_bot_photo(values: dict[str, str], config: Path | None) -> None:
     token = values["TAKT_BOT_TOKEN"]
+    identity = bot_call(token, "getMe")
+    if not isinstance(identity, dict) or not identity.get("is_bot"):
+        raise SetupError("The saved token does not identify a bot.")
+    bot_id = identity.get("id")
+    if not isinstance(bot_id, int):
+        raise SetupError("Telegram returned an invalid bot identity.")
+    avatar = ROOT / "apps" / "frontend" / "public" / "brand" / "avatar.jpg"
+    if not avatar.is_file():
+        raise SetupError(
+            "The bot avatar is missing. Restore apps/frontend/public/brand/avatar.jpg."
+        )
+    photo = avatar.read_bytes()
+    fingerprint = str(bot_id) + ":" + hashlib.sha256(photo).hexdigest()
+    current_photo = current_bot_photo(token, bot_id)
+    if (
+        values.get("TAKT_BOT_AVATAR_FINGERPRINT") == fingerprint
+        and current_photo
+        and values.get("TAKT_BOT_AVATAR_FILE_UNIQUE_ID") == current_photo
+    ):
+        return
+    bot_call(
+        token,
+        "setMyProfilePhoto",
+        {"photo": {"type": "static", "photo": "attach://avatar"}},
+        photo=photo,
+    )
+    current_photo = current_bot_photo(token, bot_id)
+    if not current_photo:
+        raise SetupError("Telegram did not confirm the bot avatar. Run configure-bot again.")
+    if config is not None:
+        updated = {
+            **values,
+            "TAKT_BOT_AVATAR_FINGERPRINT": fingerprint,
+            "TAKT_BOT_AVATAR_FILE_UNIQUE_ID": current_photo,
+        }
+        save_env(config, updated)
+        values.update(updated)
+
+
+def ensure_polling_available(token: str) -> None:
     webhook = bot_call(token, "getWebhookInfo")
     if not isinstance(webhook, dict) or webhook.get("url"):
         raise SetupError(
             "This bot already has a webhook. Resolve it explicitly before starting polling."
         )
-    bot_call(
-        token,
-        "setMyCommands",
-        {
-            "commands": [
-                {"command": "start", "description": "Открыть Такт"},
-                {"command": "help", "description": "Помощь"},
-            ],
-            "scope": {"type": "all_private_chats"},
-        },
-    )
-    bot_call(
-        token,
-        "setMyDescription",
-        {
-            "description": (
-                "Такт — личный учёт рабочего времени. Приход, уход, перерывы и статистика."
-            )
-        },
-    )
-    bot_call(
-        token,
-        "setMyShortDescription",
-        {"short_description": "Ваш рабочий день под рукой."},
-    )
+
+
+def configure_bot(values: dict[str, str], config: Path | None = None) -> None:
+    token = values["TAKT_BOT_TOKEN"]
+    ensure_polling_available(token)
+    for language in ("", "ru"):
+        bot_call(token, "setMyName", {"name": "Такт", "language_code": language})
+        bot_call(
+            token,
+            "setMyCommands",
+            {
+                "commands": [
+                    {"command": "start", "description": "Открыть Такт"},
+                    {"command": "help", "description": "Как пользоваться"},
+                ],
+                "scope": {"type": "all_private_chats"},
+                "language_code": language,
+            },
+        )
+        bot_call(
+            token,
+            "setMyDescription",
+            {
+                "description": (
+                    "Такт считает время вашего рабочего дня.\n\n"
+                    "Отмечайте приход и уход, записывайте перерывы и смотрите статистику. "
+                    "Забыли отметиться — укажите фактическое время.\n\n"
+                    "Добавляйте коллег в друзья. Участие в общем рейтинге — по желанию.\n\n"
+                    "Нажмите «Начать», затем «Открыть Такт»."
+                ),
+                "language_code": language,
+            },
+        )
+        bot_call(
+            token,
+            "setMyShortDescription",
+            {
+                "short_description": "Такт — учёт рабочего времени в Telegram. "
+                "Приход, уход, перерывы и личная статистика.",
+                "language_code": language,
+            },
+        )
     bot_call(
         token,
         "setChatMenuButton",
@@ -149,6 +251,7 @@ def configure_bot(values: dict[str, str]) -> None:
             }
         },
     )
+    configure_bot_photo(values, config)
 
 
 def verify_public_url(url: str, *, attempts: int = 30) -> None:
@@ -376,6 +479,8 @@ def deploy(config: Path, project: str, values: dict[str, str], *, setup: bool) -
     production = values.get("TAKT_PUBLIC_URL", "").startswith("https://")
     profile = ("--profile", "telegram") if production else ()
     ensure_bot_username(config, values)
+    if production:
+        ensure_polling_available(values["TAKT_BOT_TOKEN"])
     # A failed build leaves the running application untouched.
     compose(config, project, "build", "api", "web")
     compose(config, project, "up", "-d", "--wait", "db")
@@ -426,9 +531,8 @@ def deploy(config: Path, project: str, values: dict[str, str], *, setup: bool) -
     compose(config, project, "up", "-d", "--wait", "--no-deps", "api", "web")
     verify_public_url(values["TAKT_PUBLIC_URL"])
     if production:
-        if setup:
-            configure_bot(values)
         compose(config, project, *profile, "up", "-d", "--no-deps", "bot")
+        configure_bot(values, config)
     print("Takt is ready:", values["TAKT_PUBLIC_URL"])
 
 
@@ -581,8 +685,8 @@ def main(argv: list[str] | None = None) -> None:
                 raise SetupError("Telegram requires the production HTTPS configuration.")
             verify_public_url(values["TAKT_PUBLIC_URL"])
             ensure_bot_username(config, values)
-            configure_bot(values)
-            print("Telegram menu and commands configured.")
+            configure_bot(values, config)
+            print("Telegram profile, avatar, menu and commands configured.")
         elif args.action == "stop":
             profile = (
                 ("--profile", "telegram")

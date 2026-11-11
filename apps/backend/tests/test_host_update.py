@@ -37,6 +37,46 @@ def deployment(monkeypatch, tmp_path):
     return config, values, calls
 
 
+def test_profile_registration_failure_keeps_the_updated_bot_running(deployment, monkeypatch):
+    config, values, calls = deployment
+    values.update(
+        TAKT_PUBLIC_URL="https://installed.example.org",
+        TAKT_BOT_TOKEN="existing-token",
+        TAKT_BOT_USERNAME="installed_bot",
+    )
+    monkeypatch.setattr(
+        host, "ensure_polling_available", lambda token: calls.append(("webhook-preflight",))
+    )
+
+    def fail(values, config):
+        calls.append(("configure-bot",))
+        raise host.SetupError("Telegram profile request failed.")
+
+    monkeypatch.setattr(host, "configure_bot", fail)
+    with pytest.raises(host.SetupError, match="profile request failed"):
+        host.deploy(config, "installation", values, setup=False)
+    assert calls.index(("webhook-preflight",)) < calls.index(("build", "api", "web"))
+    bot_start = ("--profile", "telegram", "up", "-d", "--no-deps", "bot")
+    assert calls.index(("ready",)) < calls.index(bot_start) < calls.index(("configure-bot",))
+
+
+def test_existing_webhook_stops_deployment_before_running_containers_are_touched(
+    deployment, monkeypatch
+):
+    config, values, calls = deployment
+    values.update(
+        TAKT_PUBLIC_URL="https://installed.example.org",
+        TAKT_BOT_TOKEN="existing-token",
+        TAKT_BOT_USERNAME="installed_bot",
+    )
+    monkeypatch.setattr(
+        host, "bot_call", lambda *args: {"url": "https://another.example.org/webhook"}
+    )
+    with pytest.raises(host.SetupError, match="already has a webhook"):
+        host.deploy(config, "installation", values, setup=False)
+    assert not calls
+
+
 def test_update_quiesces_writers_and_backs_up_before_migration(deployment):
     config, values, calls = deployment
     host.deploy(config, "installation", values, setup=False)
@@ -135,12 +175,17 @@ def test_existing_installation_updates_without_prompts_and_retains_every_setting
     monkeypatch.setattr(
         host, "bot_call", lambda *args: {"is_bot": True, "username": "installed_bot"}
     )
+    monkeypatch.setattr(
+        host, "configure_bot", lambda values, config: calls.append(("configure-bot", str(config)))
+    )
     monkeypatch.setattr("builtins.input", lambda *args: pytest.fail("update asked for input"))
     host.main(["up", "--config", str(config), "--project", "existing-installation"])
     saved = host.read_env(config)
     assert {key: saved[key] for key in original} == original
     assert saved["TAKT_BOT_USERNAME"] == "installed_bot"
     assert saved["TAKT_PROJECT_NAME"] == "existing-installation"
+    assert ("configure-bot", str(config)) in calls
+    assert calls.index(("ready",)) < calls.index(("configure-bot", str(config)))
     assert ("--profile", "telegram", "up", "-d", "--no-deps", "bot") in calls
 
 

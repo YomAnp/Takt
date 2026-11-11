@@ -154,13 +154,12 @@ p {
   border-left: 1px solid color-mix(in srgb, var(--line) 55%, transparent);
   border-right: 1px solid color-mix(in srgb, var(--line) 55%, transparent);
 }
-.flower {
-  color: var(--green);
-  width: 45px;
-  height: 45px;
-  filter: drop-shadow(
-    0 0 16px color-mix(in srgb, var(--green) 24%, transparent)
-  );
+.brand-mark {
+  display: block;
+  width: 64px;
+  height: 64px;
+  border-radius: 19px;
+  flex-shrink: 0;
 }
 .avatar {
   width: 42px;
@@ -518,7 +517,7 @@ main {
 .welcome {
   padding: 22px 0;
 }
-.welcome > .flower {
+.welcome > .brand-mark {
   margin: 20px 0;
 }
 .welcome h1 {
@@ -622,9 +621,9 @@ input::placeholder {
   gap: 14px;
   color: var(--muted);
 }
-.loading .flower,
-.welcome > .flower {
-  animation: flower-arrive 900ms var(--motion-ease) both;
+.loading .brand-mark,
+.welcome > .brand-mark {
+  animation: mark-arrive 900ms var(--motion-ease) both;
 }
 .loading p,
 .welcome > h1,
@@ -1264,7 +1263,7 @@ input::placeholder {
     box-shadow: 0 20px 48px color-mix(in srgb, var(--green) 15%, transparent);
   }
 }
-@keyframes flower-arrive {
+@keyframes mark-arrive {
   from {
     opacity: 0;
     transform: scale(0.72) rotate(-12deg);
